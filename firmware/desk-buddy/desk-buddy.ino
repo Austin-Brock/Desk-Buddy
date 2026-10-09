@@ -13,9 +13,9 @@
  *   Libraries : Adafruit GFX Library, Adafruit ST7735 and ST7789 Library
  *   Serial    : 115200 baud
  *
- * Status of this file at this commit: the display is initialised and the
- * robot's resting face is drawn. The face is static -- it does not animate
- * yet.
+ * Status of this file at this commit: the display is initialised, the
+ * robot's resting face is drawn, and the eyes blink on a randomised
+ * interval. Audio and presence detection are not implemented.
  * ===========================================================================
  */
 
@@ -184,6 +184,181 @@ static void faceDraw() {
   faceDrawMouth();
 }
 
+/* ---------------------------------------------------------------------------
+ * Blink animation
+ *
+ * The blink is the whole reason this robot reads as alive rather than as a
+ * picture of a face, so it is worth describing how it is done.
+ *
+ * Approach: the eyes are redrawn at a reduced height for a few frames, which
+ * squints them shut and then reopens them. The eye band is the only part of
+ * the frame that is touched.
+ *
+ *   Why not fillScreen() + faceDraw() per frame?
+ *     Repainting all 240x320 pixels pushes 150 KB over SPI per frame. The
+ *     erase is visible as a black flash and the mouth visibly redraws even
+ *     though it never changes. Clearing only the eye band -- 160x72, about
+ *     23 KB -- is roughly a sixth of the data and shows no flicker.
+ *
+ *   Why shrink the eye instead of drawing an eyelid shape?
+ *     A rounded rectangle that loses height, keeping its vertical centre,
+ *     already looks like a closing lid, and it needs no second shape and no
+ *     knowledge of what is behind the lid.
+ *
+ *   Why a state machine instead of a loop with delay()?
+ *     A blink spans a few hundred milliseconds. Spending that in delay()
+ *     would block everything else the firmware has to do -- and will have to
+ *     do once audio and presence detection are added. Each call to
+ *     faceAnimationUpdate() advances the animation by at most one frame and
+ *     returns immediately.
+ * -------------------------------------------------------------------------*/
+
+/* Height of the eye at full closure, in pixels. Deliberately not zero: a
+ * couple of remaining rows leave a thin closed-lid line, which looks more
+ * like a closed eye than the eye vanishing entirely. */
+#define EYE_CLOSED_H  4
+
+/* Number of intermediate frames in each direction. Four steps at the frame
+ * interval below gives a closure of roughly 70 ms, which matches the feel of
+ * a natural blink; fewer steps looks like a glitch, more looks sleepy. */
+#define BLINK_STEPS  4
+
+/* Minimum time between animation frames. The SPI transfer for one eye-band
+ * repaint costs a few milliseconds on its own, so this is a floor, not a
+ * guarantee. */
+#define BLINK_FRAME_MS  18UL
+
+/* How long the eyes stay shut at full closure. */
+#define BLINK_CLOSED_HOLD_MS  70UL
+
+/* Bounds of the randomised gap between blinks. Humans blink every few
+ * seconds and irregularly; a fixed interval reads as mechanical, which is
+ * exactly the impression this robot is trying to avoid. */
+#define BLINK_INTERVAL_MIN_MS  2600UL
+#define BLINK_INTERVAL_MAX_MS  6400UL
+
+/* The bounding box of both eyes together -- the only region the blink
+ * animation is allowed to touch. Derived from the eye geometry so it stays
+ * correct if the face is re-proportioned. */
+#define EYE_BAND_X  EYE_LEFT_X
+#define EYE_BAND_Y  EYE_TOP_Y
+#define EYE_BAND_W  ((EYE_RIGHT_X + EYE_W) - EYE_LEFT_X)
+#define EYE_BAND_H  EYE_H
+
+enum FaceAnimState {
+  FACE_RESTING,        /* eyes open, waiting for the next blink   */
+  FACE_BLINK_CLOSING,  /* eye height shrinking                    */
+  FACE_BLINK_CLOSED,   /* holding shut                            */
+  FACE_BLINK_OPENING   /* eye height growing back                 */
+};
+
+static FaceAnimState faceState = FACE_RESTING;
+static uint8_t blinkStep = 0;          /* 0 = fully open, BLINK_STEPS = shut */
+static unsigned long lastFrameMs = 0;  /* when the last frame was drawn      */
+static unsigned long nextBlinkMs = 0;  /* when the next blink should start   */
+
+/* Picks the next blink time, at a random offset from now. */
+static void faceScheduleNextBlink(unsigned long now) {
+  nextBlinkMs = now + (unsigned long)random(BLINK_INTERVAL_MIN_MS,
+                                            BLINK_INTERVAL_MAX_MS);
+}
+
+/* Redraws both eyes at the given height, vertically centred on the resting
+ * eye position, repainting only the eye band.
+ *
+ * The band is cleared and redrawn in one pass rather than erasing just the
+ * difference between the old and new eye shapes. The difference region is
+ * fiddly to compute for a rounded rectangle and the saving would be a few
+ * hundred microseconds, so the simpler version wins. */
+static void faceDrawEyesAtHeight(int16_t h) {
+  if (h < EYE_CLOSED_H) {
+    h = EYE_CLOSED_H;
+  } else if (h > EYE_H) {
+    h = EYE_H;
+  }
+
+  const int16_t y = EYE_TOP_Y + (EYE_H - h) / 2;
+
+  /* Corner radius cannot exceed half the height, or fillRoundRect draws
+   * corners that overlap and the shape degenerates. */
+  int16_t r = EYE_RADIUS;
+  if (r > h / 2) {
+    r = h / 2;
+  }
+
+  tft.fillRect(EYE_BAND_X, EYE_BAND_Y, EYE_BAND_W, EYE_BAND_H, FACE_BG);
+
+  if (r > 1) {
+    tft.fillRoundRect(EYE_LEFT_X,  y, EYE_W, h, r, FACE_FG);
+    tft.fillRoundRect(EYE_RIGHT_X, y, EYE_W, h, r, FACE_FG);
+  } else {
+    /* Guard for very small closed heights, where there is no room left to
+     * round the corners. Not reached with the current EYE_CLOSED_H of 4,
+     * which still yields a radius of 2. */
+    tft.fillRect(EYE_LEFT_X,  y, EYE_W, h, FACE_FG);
+    tft.fillRect(EYE_RIGHT_X, y, EYE_W, h, FACE_FG);
+  }
+}
+
+/* Maps a blink step to an eye height: step 0 is fully open, BLINK_STEPS is
+ * fully shut, with linear interpolation in between. Integer arithmetic is
+ * used throughout -- the ESP32-C3 has no FPU, and single-pixel precision is
+ * all this needs. */
+static int16_t faceEyeHeightForStep(uint8_t step) {
+  if (step == 0)           return EYE_H;
+  if (step >= BLINK_STEPS) return EYE_CLOSED_H;
+
+  const int16_t travel = EYE_H - EYE_CLOSED_H;
+  return (int16_t)(EYE_H - (travel * (int32_t)step) / BLINK_STEPS);
+}
+
+/* Advances the face animation by at most one frame. Must be called from
+ * loop() as often as possible; it returns immediately when there is nothing
+ * to do, and never blocks. */
+static void faceAnimationUpdate(unsigned long now) {
+  switch (faceState) {
+    case FACE_RESTING:
+      /* Subtraction rather than a direct comparison so the check stays
+       * correct across the millis() rollover at ~49 days of uptime. */
+      if ((long)(now - nextBlinkMs) >= 0) {
+        faceState = FACE_BLINK_CLOSING;
+        blinkStep = 0;
+        lastFrameMs = now;
+      }
+      break;
+
+    case FACE_BLINK_CLOSING:
+      if (now - lastFrameMs >= BLINK_FRAME_MS) {
+        lastFrameMs = now;
+        blinkStep++;
+        faceDrawEyesAtHeight(faceEyeHeightForStep(blinkStep));
+        if (blinkStep >= BLINK_STEPS) {
+          faceState = FACE_BLINK_CLOSED;
+        }
+      }
+      break;
+
+    case FACE_BLINK_CLOSED:
+      if (now - lastFrameMs >= BLINK_CLOSED_HOLD_MS) {
+        lastFrameMs = now;
+        faceState = FACE_BLINK_OPENING;
+      }
+      break;
+
+    case FACE_BLINK_OPENING:
+      if (now - lastFrameMs >= BLINK_FRAME_MS) {
+        lastFrameMs = now;
+        blinkStep--;
+        faceDrawEyesAtHeight(faceEyeHeightForStep(blinkStep));
+        if (blinkStep == 0) {
+          faceState = FACE_RESTING;
+          faceScheduleNextBlink(now);
+        }
+      }
+      break;
+  }
+}
+
 void setup() {
   Serial.begin(SERIAL_BAUD);
 
@@ -210,13 +385,23 @@ void setup() {
                 tft.width(), tft.height(), TFT_ROTATION);
 
   faceDraw();
-  Serial.println(F("  stage : resting face drawn (static, no animation)"));
+
+  /* Seeded from micros() rather than from a hardware entropy source. The
+   * seed only affects how the blink rhythm differs between power-ups, which
+   * is cosmetic, and micros() avoids a dependency on an ESP-IDF header whose
+   * location has moved between core versions. */
+  randomSeed(micros());
+  faceScheduleNextBlink(millis());
+
+  Serial.println(F("  stage : face live, blink animation running"));
 }
 
 void loop() {
-  /* The face is static at this commit, so there is nothing to schedule yet.
-   * The main loop is deliberately kept free of blocking delay() calls:
-   * everything the robot will do -- animation, and later audio and presence
-   * detection -- has to be scheduled cooperatively off millis(), because a
-   * blocking wait in one subsystem would stall the others. */
+  /* The main loop is deliberately free of blocking delay() calls. Every
+   * subsystem is scheduled cooperatively off millis(), because a blocking
+   * wait in one would stall the others -- the blink animation today, and
+   * audio playback and presence detection once those are implemented. */
+  const unsigned long now = millis();
+
+  faceAnimationUpdate(now);
 }

@@ -35,7 +35,7 @@ This is the wiring the robot currently runs on.
                                       no backlight enable pin
 ```
 
-Matching firmware definitions (`firmware/desk-buddy/desk-buddy.ino`):
+Matching firmware definitions (`firmware/desk-buddy/config.h`):
 
 ```c
 #define TFT_CS    D0   /* GPIO2  */
@@ -164,7 +164,7 @@ For reproducing the current build from parts:
 1. Connect GND and 3V3 from the XIAO to the display's G and V. Confirm 3.3 V
    at the panel header with a meter before going further.
 2. Connect SCL → D8, SDA → D10, DC → D2, CS → D0. Leave RST unconnected.
-3. Flash `firmware/desk-buddy/desk-buddy.ino` (see the README for the toolchain
+3. Flash the sketch at `firmware/desk-buddy/` (see the README for the toolchain
    setup).
 4. Open the serial monitor at 115200 baud. The boot banner reports the pin map
    and the initialised resolution.

@@ -4,6 +4,12 @@ How the ST7789 panel is driven and how the face is animated.
 Everything in this document is **implemented and verified on hardware**
 unless explicitly marked otherwise.
 
+| Where the code lives | |
+|---|---|
+| `firmware/desk-buddy/config.h` | Pin map, panel geometry, palette, face proportions, animation timing — every constant quoted in this document |
+| `firmware/desk-buddy/display.cpp` | Driver instance and `displayBegin()` |
+| `firmware/desk-buddy/face.cpp` | Drawing routines, derived repaint regions, blink state machine |
+
 ---
 
 ## 1. Panel configuration
@@ -71,9 +77,9 @@ firmware *asked* for, not what the panel acknowledged.
 
 ## 2. Face geometry
 
-All coordinates are named constants derived from the panel width where
-possible, so the face can be re-proportioned in one place and the animation
-code can compute its repaint region from the same source of truth.
+All coordinates are named constants in `config.h`, derived from the panel
+width where possible, so the face can be re-proportioned in one place and the
+animation code can compute its repaint region from the same source of truth.
 
 ```
          x=40         x=144
@@ -140,8 +146,9 @@ Two rules govern all animation in this firmware:
 | `fillScreen` + redraw full face | 76 800 | 150 KB | Visible black flash per frame; the mouth is needlessly redrawn |
 | Repaint the eye band only | 11 520 | 22.5 KB | No visible flicker |
 
-The eye band is the bounding box of both eyes together, derived from the eye
-geometry rather than hard-coded:
+The eye band is the bounding box of both eyes together, derived in `face.cpp`
+from the eye geometry in `config.h` rather than hard-coded. It is an
+implementation detail of the animation, not a tunable:
 
 ```c
 #define EYE_BAND_X  EYE_LEFT_X                          /*  40      */

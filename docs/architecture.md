@@ -79,11 +79,18 @@ Expanded, with current status on every edge:
 
 ## 2. Firmware layers
 
-The firmware is structured in three conceptual layers. They are *conceptual*
-at this commit — all of the implemented code currently lives in the single
-sketch file `firmware/desk-buddy/desk-buddy.ino`, separated by section rather
-than by file. Splitting it into modules is a planned refactor, and the layer
-boundaries below are what that split will follow.
+The firmware is structured in three layers, and each one is a file:
+
+| Layer | Files | Owns |
+|---|---|---|
+| Behaviour | `desk-buddy.ino` | Boot order, the cooperative run loop |
+| Expression | `face.h` / `face.cpp` | Face geometry, drawing, blink state machine |
+| Hardware | `display.h` / `display.cpp` | Driver instance, ST7789 bring-up |
+| *(shared)* | `config.h` | Pin map, panel geometry, palette, proportions, timing |
+
+`config.h` sits outside the layering on purpose: it is data, not behaviour,
+and it has no `#include` of its own so any layer can read it without pulling
+in a dependency.
 
 ```
    +----------------------------------------------------------+
@@ -123,17 +130,19 @@ drawing code.
   power on
      |
      v
-  setup()
+  setup()                                 desk-buddy.ino
      |-- Serial.begin(115200)            bounded wait for USB CDC, max 1.5 s
-     |-- displayBegin()                  tft.init(240,320), rotation 0, clear
-     |-- faceDraw()                      full-frame draw of the resting face
+     |-- displayBegin()                  display.cpp -- tft.init(240,320),
+     |                                   rotation 0, clear to black
      |-- randomSeed(micros())
-     |-- faceScheduleNextBlink()         first blink in 2.6-6.4 s
+     |-- faceBegin(millis())             face.cpp -- full-frame draw of the
+     |                                   resting face, then schedules the
+     |                                   first blink 2.6-6.4 s out
      v
   loop()                                  runs continuously, never blocks
      |
      |-- now = millis()
-     |-- faceAnimationUpdate(now)        at most one animation frame
+     |-- faceAnimationUpdate(now)        face.cpp -- at most one frame
      |
      |   (planned) audioUpdate(now)      poll DFPlayer, dispatch reminders
      |   (planned) presenceUpdate(now)   sample PIR, update presence state
@@ -188,17 +197,21 @@ what will start consuming it.
 
 ## 5. State ownership
 
-| State | Owner | Notes |
-|---|---|---|
-| `faceState` | Expression layer | Which of the four blink states is active |
-| `blinkStep` | Expression layer | 0 = open, `BLINK_STEPS` = shut |
-| `lastFrameMs` | Expression layer | Frame pacing |
-| `nextBlinkMs` | Behaviour layer | When the next blink is due |
-| `tft` | Hardware layer | Driver instance, written only via draw helpers |
+| State | Owner | Linkage | Notes |
+|---|---|---|---|
+| `faceState` | `face.cpp` | `static` | Which of the four blink states is active |
+| `blinkStep` | `face.cpp` | `static` | 0 = open, `BLINK_STEPS` = shut |
+| `lastFrameMs` | `face.cpp` | `static` | Frame pacing |
+| `nextBlinkMs` | `face.cpp` | `static` | When the next blink is due |
+| `tft` | `display.cpp` | `extern` via `display.h` | Driver instance |
 
-No global mutable state is shared between layers, and nothing is modified from
-an interrupt context, so no synchronisation primitives are required anywhere
-in the firmware.
+Every piece of animation state is file-local to the module that owns it, so no
+other translation unit can reach it. `tft` is the one deliberate exception:
+`face.cpp` issues GFX primitives against it directly, because wrapping every
+primitive would add indirection without adding anything.
+
+Nothing is modified from an interrupt context, so no synchronisation
+primitives are required anywhere in the firmware.
 
 ---
 
@@ -208,9 +221,9 @@ Where the unimplemented subsystems are designed to attach:
 
 | Subsystem | Attaches as | Depends on |
 |---|---|---|
-| Audio reminders | A behaviour-layer scheduler plus an `audioUpdate(now)` call in `loop()` | DFPlayer wiring, UART driver — see [audio.md](audio.md) |
-| Presence detection | A `presenceUpdate(now)` call in `loop()` feeding a presence flag into the behaviour layer | PIR wiring, debounce logic |
-| Expressions / moods | A mood enum in the expression layer selecting alternative geometry | Nothing — this one is unblocked today |
+| Audio reminders | `audio.h` / `audio.cpp` beside the existing modules, plus an `audioUpdate(now)` call in `loop()` | DFPlayer wiring, UART driver — see [audio.md](audio.md) |
+| Presence detection | `presence.h` / `presence.cpp`, plus a `presenceUpdate(now)` call in `loop()` feeding a flag to the behaviour layer | PIR wiring, debounce logic |
+| Expressions / moods | A mood enum in `face.cpp` selecting alternative geometry from `config.h` | Nothing — this one is unblocked today |
 | Multi-robot coordination | A network module, polled from `loop()` like everything else | Wi-Fi, a central service, a protocol — all V2 |
 
 The ordering in the [roadmap](project-roadmap.md) follows the dependency

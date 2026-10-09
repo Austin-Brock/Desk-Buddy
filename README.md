@@ -57,8 +57,8 @@ was built, what was chosen over what, and what remains unbuilt.
 
 ## 3. Demo
 
-No photo or video has been captured yet. What the robot does right now, in
-words:
+No photo or video has been captured yet — see
+[docs/media](docs/media/README.md). What the robot does right now, in words:
 
 ```
   +----------------------------+        +----------------------------+
@@ -129,6 +129,9 @@ Full electrical notes, GPIO constraints, and the power budget:
 | Display driver | [Adafruit ST7735 and ST7789 Library](https://github.com/adafruit/Adafruit-ST7735-Library) |
 | Bus | `SPI` (Arduino core) |
 | Planned | `DFRobotDFPlayerMini` for audio — not yet a dependency |
+
+The firmware is split into an entry point, a configuration header, and one
+module per layer; see [§11](#11-repository-structure).
 
 Why Adafruit GFX rather than a faster alternative such as TFT_eSPI: the face
 is a handful of filled primitives, not a sprite engine. GFX is the better
@@ -270,6 +273,8 @@ hours without a reset.
 Dependency ordering, exit criteria, backlog, and explicit non-goals:
 **[docs/project-roadmap.md](docs/project-roadmap.md)**
 
+All engineering documentation is indexed at **[docs/](docs/README.md)**.
+
 ---
 
 ## 11. Repository structure
@@ -280,20 +285,36 @@ Desk-Buddy/
 ├── LICENSE                       MIT
 ├── .gitignore
 ├── firmware/
-│   └── desk-buddy/
-│       └── desk-buddy.ino        all firmware (single sketch; split planned)
+│   └── desk-buddy/               Arduino sketch (folder name must match .ino)
+│       ├── desk-buddy.ino        entry point: boot order + run loop
+│       ├── config.h              pin map, geometry, palette, timing
+│       ├── display.h / .cpp      hardware layer: ST7789 bring-up
+│       └── face.h / .cpp         expression layer: face + blink animation
 └── docs/
     ├── architecture.md           system diagram, layers, scheduling model
     ├── hardware.md               BOM, GPIO constraints, power budget
     ├── wiring.md                 connection tables, pin allocation, bring-up
     ├── display.md                ST7789 config, animation architecture
     ├── audio.md                  DFPlayer integration plan (not implemented)
-    └── project-roadmap.md        phases, exit criteria, non-goals
+    ├── project-roadmap.md        phases, exit criteria, non-goals
+    └── media/                    photos and GIFs (none captured yet)
 ```
+
+### Where to look for what
+
+| If you want to… | Open |
+|---|---|
+| Change the face's proportions, colours, or blink rhythm | `firmware/desk-buddy/config.h` |
+| Change the pin map | `firmware/desk-buddy/config.h` |
+| See how the panel is brought up | `firmware/desk-buddy/display.cpp` |
+| See how the face is drawn and animated | `firmware/desk-buddy/face.cpp` |
+| See the boot order and the scheduler | `firmware/desk-buddy/desk-buddy.ino` |
+| Understand *why* any of it is that way | `docs/` |
 
 The Arduino IDE requires a sketch's folder name to match its `.ino` file name,
 which is why the firmware is nested as `firmware/desk-buddy/desk-buddy.ino`
-rather than sitting directly under `firmware/`.
+rather than sitting directly under `firmware/`. Every `.cpp` beside it is
+compiled into the sketch automatically.
 
 ---
 

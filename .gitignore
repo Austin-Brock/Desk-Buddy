@@ -1,0 +1,78 @@
+# ---------------------------------------------------------------------------
+# Desk-Buddy .gitignore
+#
+# Goals:
+#   1. Keep compiled firmware artifacts out of the repository. Arduino/ESP32
+#      builds are large, machine-specific, and fully reproducible from source.
+#   2. Keep OS and editor metadata out of the history.
+#   3. Keep credentials (Wi-Fi SSIDs, API tokens for future network features)
+#      out of the history permanently -- a secret committed once stays in the
+#      git objects forever, so it is excluded before any such file exists.
+#   4. Keep audio media out of the repository. The microSD card content is
+#      binary, large, and the redistribution rights of the source clips are
+#      not established. See docs/audio.md.
+# ---------------------------------------------------------------------------
+
+# --- Arduino / PlatformIO / ESP32 build output ---
+build/
+.build/
+*.bin
+*.elf
+*.hex
+*.map
+*.d
+*.o
+*.a
+*.su
+.pio/
+.pioenvs/
+.piolibdeps/
+# Arduino IDE 2.x per-sketch generated metadata
+firmware/**/build/
+sketch/
+
+# --- Secrets and local configuration ---
+# Any file matching these patterns is assumed to hold credentials and must
+# never be committed. Commit a *.example counterpart instead.
+secrets.h
+credentials.h
+arduino_secrets.h
+*.secret
+*.secrets
+.env
+.env.*
+!.env.example
+
+# --- Audio media (see docs/audio.md) ---
+# The DFPlayer Mini reads these directly from the microSD card; the repo
+# documents the required layout rather than shipping the files.
+*.mp3
+*.wav
+*.ogg
+*.flac
+sdcard/
+
+# --- Large binary media that belongs in a release, not the history ---
+*.mov
+*.mp4
+*.zip
+*.tar.gz
+
+# --- OS metadata ---
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# --- Editor / IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.cache/
+compile_commands.json

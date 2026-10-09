@@ -13,8 +13,9 @@
  *   Libraries : Adafruit GFX Library, Adafruit ST7735 and ST7789 Library
  *   Serial    : 115200 baud
  *
- * Status of this file at this commit: the display is initialised and
- * cleared. No face is drawn yet.
+ * Status of this file at this commit: the display is initialised and the
+ * robot's resting face is drawn. The face is static -- it does not animate
+ * yet.
  * ===========================================================================
  */
 
@@ -104,6 +105,85 @@ static void displayBegin() {
   tft.fillScreen(ST77XX_BLACK);
 }
 
+/* ---------------------------------------------------------------------------
+ * Face geometry
+ *
+ * The face is intentionally minimalist: two solid rounded-rectangle eyes and
+ * a simple arc smile, white on black. Design reasoning:
+ *
+ *  - Solid eyes with no pupils read as friendly and alert at a glance from
+ *    across a desk, and they are cheap to redraw, which matters because the
+ *    blink animation will repaint the eye region repeatedly.
+ *  - Pure white on pure black suits the IPS panel's contrast and means the
+ *    "erase" colour is the same as the background, so clearing a region is a
+ *    single fillRect rather than a redraw of anything underneath.
+ *  - Every coordinate is a named constant rather than a literal so the face
+ *    can be re-proportioned in one place, and so the animation code can
+ *    compute the exact bounding box it needs to repaint.
+ *
+ * Layout in the 240x320 portrait frame:
+ *
+ *        x=40        x=144
+ *          +----+      +----+          y=96   eye top
+ *          |    |      |    |
+ *          +----+      +----+          y=168  eye bottom
+ *               \____/                 y=242  mouth bottom
+ * -------------------------------------------------------------------------*/
+
+/* Foreground and background. FACE_BG doubles as the erase colour. */
+#define FACE_FG  ST77XX_WHITE
+#define FACE_BG  ST77XX_BLACK
+
+/* Eyes. Two identical rounded rectangles, symmetric about the screen centre.
+ * EYE_LEFT_X is derived from the panel width so the pair stays centred if the
+ * eye size or the gap between them is changed. */
+#define EYE_W        56
+#define EYE_H        72
+#define EYE_RADIUS   18
+#define EYE_GAP      48
+#define EYE_TOP_Y    96
+#define EYE_LEFT_X   ((TFT_WIDTH - (2 * EYE_W + EYE_GAP)) / 2)
+#define EYE_RIGHT_X  (EYE_LEFT_X + EYE_W + EYE_GAP)
+
+/* Mouth. Drawn as the bottom half of a circle, which gives a cleaner curve
+ * than stitching line segments together. Thickness is produced by drawing
+ * several concentric arcs, because Adafruit_GFX has no stroke width. */
+#define MOUTH_CENTER_X   (TFT_WIDTH / 2)
+#define MOUTH_CENTER_Y   196
+#define MOUTH_RADIUS     46
+#define MOUTH_THICKNESS  3
+
+/* Adafruit_GFX drawCircleHelper() corner mask: bit 1 = top-right,
+ * 2 = top-left, 4 = bottom-right, 8 = bottom-left. The two bottom quadrants
+ * together form the smile. */
+#define MOUTH_CORNER_MASK (4 | 8)
+
+/* Draws both eyes in their fully open resting state. */
+static void faceDrawEyes() {
+  tft.fillRoundRect(EYE_LEFT_X,  EYE_TOP_Y, EYE_W, EYE_H, EYE_RADIUS, FACE_FG);
+  tft.fillRoundRect(EYE_RIGHT_X, EYE_TOP_Y, EYE_W, EYE_H, EYE_RADIUS, FACE_FG);
+}
+
+/* Draws the smile. */
+static void faceDrawMouth() {
+  for (int i = 0; i < MOUTH_THICKNESS; i++) {
+    tft.drawCircleHelper(MOUTH_CENTER_X, MOUTH_CENTER_Y,
+                         MOUTH_RADIUS - i, MOUTH_CORNER_MASK, FACE_FG);
+  }
+}
+
+/* Draws the complete resting face, clearing the frame first so it can be
+ * called at any time to return the robot to its resting expression.
+ *
+ * This is the only routine that touches the whole frame. Animation must not
+ * call it, because repainting the full 240x320 frame over SPI is visible as a
+ * flicker; animation repaints only the region it changes. */
+static void faceDraw() {
+  tft.fillScreen(FACE_BG);
+  faceDrawEyes();
+  faceDrawMouth();
+}
+
 void setup() {
   Serial.begin(SERIAL_BAUD);
 
@@ -128,13 +208,15 @@ void setup() {
    * visually: the panel backlight comes on and the screen goes black. */
   Serial.printf("  tft   : initialised %dx%d, rotation %d\n",
                 tft.width(), tft.height(), TFT_ROTATION);
-  Serial.println(F("  stage : display cleared (no face drawn yet)"));
+
+  faceDraw();
+  Serial.println(F("  stage : resting face drawn (static, no animation)"));
 }
 
 void loop() {
-  /* Nothing to schedule yet. The main loop is deliberately kept free of
-   * blocking delay() calls: everything the robot will do -- animation, and
-   * later audio and presence detection -- has to be scheduled cooperatively
-   * off millis(), because a blocking wait in one subsystem would stall the
-   * others. */
+  /* The face is static at this commit, so there is nothing to schedule yet.
+   * The main loop is deliberately kept free of blocking delay() calls:
+   * everything the robot will do -- animation, and later audio and presence
+   * detection -- has to be scheduled cooperatively off millis(), because a
+   * blocking wait in one subsystem would stall the others. */
 }

@@ -1,21 +1,84 @@
-# Audio subsystem — integration plan
+# Audio subsystem
 
-> ## Status: NOT IMPLEMENTED
+> ## Status: STANDALONE PLAYBACK VERIFIED — NOT INTEGRATED
 >
-> No audio code exists in the firmware. The DFPlayer Mini is not wired to the
-> XIAO. No audio has been played by this robot.
+> **Verified on hardware:** the DFPlayer module plays MP3 files from its
+> microSD card through the speaker, driven over UART by the XIAO ESP32C3.
 >
-> What *is* done: the module, speaker, and a 16 GB microSD card are on hand,
-> and the card has been formatted FAT and populated with MP3 files under
-> `/mp3/`.
+> **Not verified:** audio and the animated display running at the same time.
+> The two subsystems have each been proven on their own and have never been
+> run together.
 >
-> This document is the design and the integration plan. Every interface,
-> frame, and constant below is **proposed**. Nothing here has been verified
-> against hardware.
+> **Not implemented:** there is no audio code in the project firmware. The
+> verification below was done with a separate standalone bench sketch that
+> uses blocking `delay()` calls, which the firmware's scheduling model does
+> not permit. See [§1](#1-hardware-verification-october-2026).
+>
+> The design sections of this document (§2 onward) remain the plan;
+> items still marked **proposed** there have not been built.
 
 ---
 
-## 1. Why DFPlayer Mini
+## 1. Hardware verification — October 2026
+
+**Status: standalone audio playback verified.**
+
+### Verified functionality
+
+- DFPlayer module (board marking **HW-247A**, a DFPlayer Mini variant)
+  connected to the XIAO ESP32C3.
+- UART communication operating at 9600 baud.
+- 3 W 8 Ω speaker connected across SPK_1 and SPK_2.
+- microSD card successfully read by the DFPlayer.
+- Three MP3 files played sequentially:
+  - `/mp3/0001.mp3`
+  - `/mp3/0002.mp3`
+  - `/mp3/0003.mp3`
+- 20-second intervals between playback commands.
+- Audio playback completed successfully.
+
+### What the 20 seconds actually means
+
+The test issued a playback command, waited 20 seconds, then issued the next
+one. That is **20 seconds between the start of each clip, not 20 seconds of
+silence after each clip ends.** The silence between clips is 20 seconds minus
+each clip's own duration, and the clip durations were not measured during this
+test. If a clip were longer than 20 seconds, the next command would arrive
+while it was still playing — which did not happen here, but is not something
+this test ruled out.
+
+This distinction matters for the reminder scheduler: a reminder interval has
+to be measured from playback *completion*, polled via the BUSY signal or a
+status query, not from the previous command.
+
+### Implementation details
+
+The standalone test drives the DFPlayer with direct UART commands:
+
+| Command | Function |
+|---|---|
+| `0x06` | Set volume |
+| `0x12` | Play numbered file from `/mp3/` |
+
+It uses `delay(20000)` between playback commands. **That is acceptable for a
+standalone bench test and is not acceptable in the firmware.** A 20-second
+blocking wait would freeze the blink animation entirely — this is precisely
+the failure the cooperative scheduling model exists to prevent. See
+[architecture.md](architecture.md).
+
+The bench sketch is not committed to this repository.
+
+### Remaining work
+
+- Integrate audio into the modular firmware.
+- Verify simultaneous display animation and audio.
+- Implement non-blocking playback scheduling.
+- Add reminder functionality.
+- Integrate HC-SR501 motion detection.
+
+---
+
+## 2. Why DFPlayer Mini
 
 The decision that forces this choice: **the ESP32-C3 has no DAC.** Unlike the
 original ESP32, it has no digital-to-analog converter on the die, so there is
@@ -52,10 +115,14 @@ replaced rather than extended. That is an accepted V1 trade-off.
 
 ---
 
-## 2. Wiring
+## 3. Wiring
 
-See [wiring.md](wiring.md) for the full table and diagram. Summary of the
-**planned** connections:
+See [wiring.md](wiring.md) for the full table and diagram.
+
+The module is **wired and playback is verified**. The table below is the
+wiring this document proposed; the pin assignment and series resistor actually
+used in the verified build still need to be recorded here and in
+[wiring.md](wiring.md) — see [§9](#9-open-questions).
 
 | DFPlayer | XIAO | Note |
 |---|---|---|
@@ -68,7 +135,7 @@ See [wiring.md](wiring.md) for the full table and diagram. Summary of the
 
 ---
 
-## 3. microSD card layout
+## 4. microSD card layout
 
 The card is formatted FAT and currently holds:
 
@@ -104,16 +171,20 @@ Two properties of this module's file handling that the layout has to respect:
 The numbering is the firmware's contract with the card, so it belongs in
 version control even though the audio files do not.
 
-| Track | Intended purpose |
-|---|---|
-| 0001 | *to be confirmed against the card* |
-| 0002 | *to be confirmed against the card* |
-| 000N | *to be confirmed against the card* |
+| Track | File | Plays | Intended purpose |
+|---|---|---|---|
+| 1 | `/mp3/0001.mp3` | ✅ verified | *not yet assigned* |
+| 2 | `/mp3/0002.mp3` | ✅ verified | *not yet assigned* |
+| 3 | `/mp3/0003.mp3` | ✅ verified | *not yet assigned* |
 
-This table is deliberately unfilled. Several clips have been converted and
-copied to the card, but their mapping to robot behaviours has not been
-decided, and guessing it here would put a fiction into the documentation.
-Filling this in is step 1 of the integration plan below.
+All three files have been played successfully by command `0x12`, which
+confirms the card layout, the filename-to-track-number mapping, and the
+DFPlayer's ability to read the card.
+
+The purpose column is deliberately unfilled: which robot behaviour each clip
+belongs to has not been decided, and guessing it here would put a fiction into
+the documentation. Clip durations were not measured either — see
+[§1](#1-hardware-verification-october-2026).
 
 ### Why no audio files are in this repository
 
@@ -130,7 +201,7 @@ anyone can populate a card with their own clips.
 
 ---
 
-## 4. Control protocol
+## 5. Control protocol
 
 The DFPlayer speaks a fixed 10-byte frame over UART at **9600 baud, 8N1**:
 
@@ -164,7 +235,7 @@ the line and check the bytes.
 
 ---
 
-## 5. Proposed firmware interface
+## 6. Proposed firmware interface
 
 A sketch of the intended module boundary. **This code does not exist yet.**
 
@@ -202,51 +273,69 @@ Design constraints this interface has to satisfy:
 
 ---
 
-## 6. Integration plan
+## 7. Integration plan
 
 Ordered, with an explicit acceptance test per step. No step is complete until
 its test passes on hardware.
 
-| Step | Work | Acceptance test |
-|---|---|---|
-| 1 | Audit the microSD card: confirm FAT32, list `/mp3/`, delete macOS metadata, fill in the track allocation table above | Card contains only `/mp3/NNNN.mp3`; the table in this document matches reality |
-| 2 | Move the build to the breadboard; establish a shared 5 V rail and a common ground | Display still runs; 5 V and 3V3 confirmed with a meter |
-| 3 | Wire the DFPlayer per [wiring.md](wiring.md), including the 1 kΩ on RX and bulk capacitance on VCC | Module powers up; display unaffected |
-| 4 | Speaker across SPK_1/SPK_2 | Continuity confirmed; neither terminal grounded |
-| 5 | Add the UART driver and `audioBegin()`; log the handshake result over USB serial | Serial reports a successful DFPlayer handshake |
-| 6 | Play track 1 from `setup()` at low volume | Audio is audible and recognisable |
-| 7 | Add `audioUpdate()` and non-blocking completion polling | A clip plays through while the eyes keep blinking on schedule, with no visible hitch in the animation |
-| 8 | Add the reminder scheduler: configurable interval, selects a clip | A reminder fires on its interval while the face animates normally |
-| 9 | Measure current draw at idle and at playback peak | Figures recorded in [hardware.md](hardware.md), replacing the datasheet estimates |
+| | Step | Work | Acceptance test |
+|---|---|---|---|
+| ✅ | 1 | Audit the microSD card and confirm `/mp3/` playback | Three files played by track number |
+| ✅ | 3 | Wire the DFPlayer | Module powers up and responds over UART |
+| ✅ | 4 | Speaker across SPK_1/SPK_2 | Audio audible through the speaker |
+| ✅ | 5 | UART driver and handshake | Module accepts commands at 9600 baud |
+| ✅ | 6 | Play a track at a set volume | Three clips played sequentially |
+| ⬜ | 2 | Move the build to the breadboard; shared 5 V rail and common ground | Display still runs; 5 V and 3V3 confirmed with a meter |
+| ⬜ | 7 | Port the audio code into the firmware as `audioUpdate()` with non-blocking completion polling | A clip plays through while the eyes keep blinking on schedule, with no visible hitch in the animation |
+| ⬜ | 8 | Reminder scheduler: configurable interval, selects a clip | A reminder fires on its interval while the face animates normally |
+| ⬜ | 9 | Measure current draw at idle and at playback peak | Figures recorded in [hardware.md](hardware.md), replacing the datasheet estimates |
 
-Step 7 is the one that actually matters. Everything before it proves the
-module works; step 7 proves the two subsystems coexist, which is the real
-question the cooperative scheduling model was designed to answer.
+Steps 3–6 were completed out of order with step 2: the module was proven on a
+standalone bench sketch before the build moved to the breadboard. Step 2 is
+therefore still open, and it is now the immediate next task, because the
+display and the DFPlayer need a shared 5 V rail and a single common ground
+point to run together at all.
 
----
-
-## 7. Identified risks
-
-| Risk | Why it is plausible | Planned mitigation |
-|---|---|---|
-| Audible hiss or SPI clock bleeding into the speaker | Shared ground return with a fast SPI bus is a classic cause | 1 kΩ on DFPlayer RX; DFPlayer ground direct to the XIAO; keep speaker wiring away from the SPI lines |
-| Brownout or reset during loud playback | Amplifier peaks (~600 mA) against a 500 mA USB port | Conservative default volume; bulk capacitance; a supply with headroom |
-| DFPlayer does not acknowledge the handshake | TX/RX swapped, missing common ground, or module not yet ready after power-up | Check ground first, then swap TX/RX, then add a post-power-up delay before the handshake |
-| Clone modules behave differently | DFPlayer Mini is widely cloned; YX5200 and MH2024K variants differ in timing and command support | Verify against the actual module; prefer `/mp3/` addressing, which is the best supported across variants |
-| Animation stutters during playback | Serial handling competing with SPI transfers on one core | Step 7's acceptance test exists specifically to catch this |
-| Card not recognised | Wrong format, exFAT, or stray metadata files | FAT32, `/mp3/NNNN.mp3` only, metadata stripped |
+**Step 7 is the one that actually matters.** Steps 1–6 proved the module
+works. Step 7 proves the two subsystems coexist, which is the real question
+the cooperative scheduling model was designed to answer, and it is the step
+that replaces the bench sketch's `delay(20000)` with `millis()`-based
+scheduling.
 
 ---
 
-## 8. Open questions
+## 8. Identified risks
 
-- What are the actual clip contents, and which robot behaviour does each one
-  belong to?
+| Risk | Status | Why it is plausible | Mitigation |
+|---|---|---|---|
+| Audible hiss or SPI clock bleeding into the speaker | **Open** — not assessable yet | Shared ground return with a fast SPI bus is a classic cause; the display was not running during the audio test, so this has not been exercised | 1 kΩ on DFPlayer RX; DFPlayer ground direct to the XIAO; keep speaker wiring away from the SPI lines |
+| Brownout or reset during loud playback | **Open** | Amplifier peaks (~600 mA) against a 500 mA USB port; the test volume and the panel's concurrent draw are both unrecorded | Conservative volume; bulk capacitance; a supply with headroom; measure in step 9 |
+| DFPlayer does not acknowledge commands | **Retired** | TX/RX swapped, missing common ground, or module not ready after power-up | Resolved: the module accepts commands at 9600 baud |
+| Clone modules behave differently | **Reduced** | DFPlayer Mini is widely cloned and variants differ in timing and command support | The module in hand is marked **HW-247A** and responds correctly to `0x06` and `0x12`; other commands, notably status queries and the BUSY behaviour, are still unproven on this variant |
+| Card not recognised | **Retired** | Wrong format, exFAT, or stray metadata files | Resolved: the card is read and `/mp3/NNNN.mp3` addressing works |
+| Animation stutters during playback | **Open — the main open risk** | Serial handling competing with SPI transfers on one core, and the two subsystems have never run together | Step 7's acceptance test exists specifically to catch this |
+| A clip outlasts its reminder interval | **Open** | The bench test spaced *commands* 20 s apart without measuring clip length, so overlap was never ruled out | Schedule from playback completion (BUSY or status query), not from the previous command |
+
+---
+
+## 9. Open questions
+
+- **Which pins and what series resistance does the verified build actually
+  use?** The wiring tables in this document and in [wiring.md](wiring.md) are
+  still the *proposed* assignment (D3 → RX via 1 kΩ, D1 ← TX). The as-built
+  wiring must be recorded before those tables can be marked verified.
+- **What volume value was used**, and what is the actual current draw at that
+  volume?
+- **How long is each clip?** Needed before any reminder interval can be
+  chosen sensibly, and needed to know whether command-spaced playback can
+  overlap.
+- What are the clip contents, and which robot behaviour does each belong to?
+- **Is the BUSY pin worth a GPIO on this HW-247A variant, or is a status query
+  enough?** This was a minor question before; the 20-second finding promotes
+  it, because non-blocking scheduling needs a reliable completion signal.
 - Should reminder intervals be compile-time constants for V1, or stored in
   NVS so they survive a reflash? (Related: there is no input device on the
   robot yet, so there is nothing to configure them *with* — see the
   [roadmap](project-roadmap.md).)
 - Should the face react to playback — a mouth animation while a clip plays,
-  gated on the BUSY pin? Cheap to do and a large gain in expressiveness, but
-  it depends on this subsystem existing first.
-- Is the BUSY pin worth a GPIO, or is polling the status query enough?
+  gated on the BUSY signal? Cheap to do and a large gain in expressiveness.

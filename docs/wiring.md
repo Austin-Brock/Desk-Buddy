@@ -56,9 +56,16 @@ Two mistakes this table is written to prevent:
 
 ---
 
-## 2. Audio — DFPlayer Mini → XIAO ESP32C3 · **Planned, not yet wired**
+## 2. Audio — DFPlayer → XIAO ESP32C3 · **Wired and playing; as-built pins not yet recorded**
 
-Proposed wiring for the next hardware milestone. Unverified.
+The DFPlayer (board marking **HW-247A**) is wired and playback is verified:
+three MP3 files played from the microSD card through the speaker. See
+[audio.md](audio.md).
+
+> **This table is still the *proposed* wiring, not a record of the verified
+> build.** The pin assignment and series resistance actually used have not
+> been confirmed, so they have not been marked verified here. Confirming them
+> is an open item in [audio.md §9](audio.md#9-open-questions).
 
 | DFPlayer pin | XIAO pin | GPIO | Notes |
 |---|---|---|---|
@@ -140,17 +147,17 @@ to that.
 
 | XIAO | GPIO | Assigned to | Status |
 |---|---|---|---|
-| D0 | 2 | Display CS | **Implemented** |
-| D1 | 3 | DFPlayer TX → MCU RX | **Planned** |
-| D2 | 4 | Display DC | **Implemented** |
-| D3 | 5 | MCU TX → DFPlayer RX | **Planned** |
+| D0 | 2 | Display CS | **Verified** |
+| D1 | 3 | DFPlayer TX → MCU RX | **Proposed** — as-built pin not yet confirmed |
+| D2 | 4 | Display DC | **Verified** |
+| D3 | 5 | MCU TX → DFPlayer RX | **Proposed** — as-built pin not yet confirmed |
 | D4 | 6 | *free* | — |
 | D5 | 7 | PIR OUT | **Planned** |
 | D6 | 21 | *free* (default UART0 TX) | — |
 | D7 | 20 | *free* (default UART0 RX) | — |
-| D8 | 8 | Display SCL (SPI SCK) | **Implemented** |
+| D8 | 8 | Display SCL (SPI SCK) | **Verified** |
 | D9 | 9 | *reserved* — BOOT button, strapping pin | avoid |
-| D10 | 10 | Display SDA (SPI MOSI) | **Implemented** |
+| D10 | 10 | Display SDA (SPI MOSI) | **Verified** |
 
 With the display, audio, and PIR all connected, three pins (D4, D6, D7) remain
 free for expansion.

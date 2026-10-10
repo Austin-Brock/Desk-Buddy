@@ -19,17 +19,19 @@ the firmware.
 |---|---|---|---|---|
 | 1 | Seeed Studio XIAO ESP32C3 | 1 | USB-C | **Implemented** |
 | 2 | 2.0" 240x320 ST7789 SPI IPS TFT | 1 | 4-wire SPI | **Implemented** |
-| 3 | DFPlayer Mini MP3 module | 1 | UART, 9600 8N1 | **In progress** |
-| 4 | 3 W 8 Ω speaker | 1 | Analog, differential | **In progress** |
-| 5 | 16 GB microSD card (FAT32) | 1 | Hosted by DFPlayer | **In progress** |
+| 3 | DFPlayer module (HW-247A) | 1 | UART, 9600 8N1 | **Playback verified** |
+| 4 | 3 W 8 Ω speaker | 1 | Analog, differential | **Playback verified** |
+| 5 | 16 GB microSD card (FAT) | 1 | Hosted by DFPlayer | **Playback verified** |
 | 6 | HC-SR501 PIR motion sensor | 1 | Digital, 3.3 V out | **Planned** |
 | 7 | Breadboard | 1 | — | Ordered, not yet incorporated |
 | 8 | Dupont jumper wires | — | — | In use |
 
 Everything on the implemented list is currently assembled with Dupont jumpers
-directly between modules. Moving to the breadboard is a prerequisite for the
-audio work, because the DFPlayer needs a shared 5 V rail and a common ground
-that jumper-to-jumper wiring cannot distribute cleanly.
+directly between modules. The display and the audio subsystem have been
+verified *separately*, each on its own; moving to the breadboard is the
+prerequisite for running them together, because sharing a 5 V rail and a
+single common ground point between three modules is not something
+jumper-to-jumper wiring distributes cleanly.
 
 ---
 
@@ -127,15 +129,20 @@ MCU, so no level shifting is involved anywhere in the display path.
 
 ---
 
-## 4. Audio: DFPlayer Mini — **integration in progress**
+## 4. Audio: DFPlayer Mini — **standalone playback verified**
 
-Nothing in this section has been verified on hardware yet. It records the
-design and the hazards identified while planning it. See
-[audio.md](audio.md) for the integration plan.
+The module plays MP3 files from its microSD card through the speaker, driven
+over UART by the XIAO. The module in hand carries the board marking
+**HW-247A**, a DFPlayer Mini variant.
+
+What is **not** verified: audio and the display running together, and
+therefore none of the interference or power hazards below. Those were
+identified while planning and remain unassessed. See [audio.md](audio.md) for
+the verification record and the integration plan.
 
 | Property | Value |
 |---|---|
-| Module | DFPlayer Mini (YX5200 / MH2024K class) |
+| Module | DFPlayer Mini variant, board marking HW-247A |
 | Supply | 5 V recommended (3.2–5.0 V range) |
 | Control | UART, 9600 baud, 8N1 |
 | Control logic level | 3.3 V tolerant |
@@ -197,8 +204,8 @@ Current configuration: **USB-C from a host computer or wall adapter, 5 V bus.**
 |---|---|---|---|
 | XIAO ESP32C3 (radio idle) | 3V3 | tens of mA | Wi-Fi unused in V1 |
 | ST7789 panel + backlight | 3V3 | tens of mA, continuous | Cannot be gated — no BL pin |
-| DFPlayer Mini, idle | 5 V | ~20 mA | **In progress** |
-| DFPlayer Mini + amplifier, peaks | 5 V | up to ~600 mA | **In progress** |
+| DFPlayer, idle | 5 V | ~20 mA | Not measured |
+| DFPlayer + amplifier, peaks | 5 V | up to ~600 mA | Not measured; playback volume during the verification test was not recorded |
 
 The figures above are order-of-magnitude expectations from the parts'
 datasheets, not measurements taken on this build. Measuring the assembled

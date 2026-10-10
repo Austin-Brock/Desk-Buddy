@@ -12,11 +12,14 @@ how control flows between them.
                               |
                        XIAO ESP32C3
                        /            \
-                ST7789 Display    DFPlayer Mini   <-- integration
-                      |                 |             in progress
+                ST7789 Display    DFPlayer HW-247A
+                      |                 |
                 Animated Face        microSD
                    (working)             |
                                       Speaker
+                                   (plays, but only
+                                    from a standalone
+                                    bench sketch)
 ```
 
 Expanded, with current status on every edge:
@@ -35,25 +38,26 @@ Expanded, with current status on every edge:
                         +---------------------------+
                            |                     |
             hardware SPI   |                     |  UART 9600 8N1
-            4-wire, write  |                     |  (PLANNED)
-            only           |                     |
+            4-wire, write  |                     |  (verified on a
+            only           |                     |   bench sketch, not
+                           |                     |   in this firmware)
                            v                     v
           +-------------------------+   +-------------------------+
-          |   ST7789 240x320 IPS    |   |    DFPlayer Mini        |
-          |   IMPLEMENTED           |   |    NOT YET WIRED        |
+          |   ST7789 240x320 IPS    |   |   DFPlayer HW-247A      |
+          |   IMPLEMENTED           |   |   WIRED, PLAYS          |
           +-------------------------+   +-------------------------+
                            |                     |
                            v                     v
           +-------------------------+   +-------------------------+
-          |      Animated face      |   |   microSD, FAT32        |
-          |  eyes + smile, blink    |   |   /mp3/0001.mp3 ...     |
-          |   WORKING               |   |   card prepared         |
+          |      Animated face      |   |   microSD, FAT          |
+          |  eyes + smile, blink    |   |   /mp3/0001-0003.mp3    |
+          |   WORKING               |   |   READ, 3 TRACKS PLAY   |
           +-------------------------+   +-------------------------+
                                                  |
                                                  v
                                      +-------------------------+
                                      |   3 W 8 ohm speaker     |
-                                     |   NOT YET CONNECTED     |
+                                     |   AUDIO VERIFIED        |
                                      +-------------------------+
 
    - - - - - - - - - - -  planned, nothing built  - - - - - - - - - - -
@@ -69,9 +73,10 @@ Expanded, with current status on every edge:
 |---|---|---|
 | MCU → display | 4-wire SPI, hardware peripheral | **Implemented** |
 | Display → face | Adafruit GFX primitives | **Implemented** |
-| MCU → DFPlayer | UART, 9600 8N1 | **Planned** — not wired, no firmware |
-| DFPlayer → microSD | Internal to the module | Card prepared, untested in situ |
-| DFPlayer → speaker | Differential analog | **Planned** — not connected |
+| MCU → DFPlayer | UART, 9600 8N1 | **Verified on a standalone bench sketch** — no audio code in this firmware |
+| DFPlayer → microSD | Internal to the module | **Verified** — card read, three tracks play |
+| DFPlayer → speaker | Differential analog | **Verified** — audio audible |
+| Display **and** audio together | — | **Not verified** — never run at the same time |
 | PIR → MCU | Digital input | **Planned** |
 | MCU → network | Wi-Fi | **Planned** (V2) |
 
@@ -221,7 +226,7 @@ Where the unimplemented subsystems are designed to attach:
 
 | Subsystem | Attaches as | Depends on |
 |---|---|---|
-| Audio reminders | `audio.h` / `audio.cpp` beside the existing modules, plus an `audioUpdate(now)` call in `loop()` | DFPlayer wiring, UART driver — see [audio.md](audio.md) |
+| Audio reminders | `audio.h` / `audio.cpp` beside the existing modules, plus an `audioUpdate(now)` call in `loop()` | Porting the verified bench code to non-blocking form — see [audio.md](audio.md) |
 | Presence detection | `presence.h` / `presence.cpp`, plus a `presenceUpdate(now)` call in `loop()` feeding a flag to the behaviour layer | PIR wiring, debounce logic |
 | Expressions / moods | A mood enum in `face.cpp` selecting alternative geometry from `config.h` | Nothing — this one is unblocked today |
 | Multi-robot coordination | A network module, polled from `loop()` like everything else | Wi-Fi, a central service, a protocol — all V2 |

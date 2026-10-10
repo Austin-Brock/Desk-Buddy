@@ -13,7 +13,8 @@ dependency instead: each phase unblocks the next.
 | | |
 |---|---|
 | **Working** | ST7789 display bring-up, minimalist face, non-blocking randomised blink animation |
-| **In progress** | DFPlayer Mini audio integration — parts on hand, card prepared, nothing wired |
+| **Working, separately** | DFPlayer audio: three MP3 files played sequentially from microSD through the speaker — verified on a standalone bench sketch, **not** in the project firmware |
+| **In progress** | Running display and audio together, and porting the audio code into the firmware with non-blocking scheduling |
 | **Planned next** | Reminder scheduling, then presence detection |
 | **Power** | USB-C only |
 | **Enclosure** | None — bare modules on jumper wires |
@@ -43,19 +44,34 @@ This is first because the audio module needs a 5 V rail and a clean ground
 that module-to-module jumpers cannot provide. See
 [hardware.md](hardware.md).
 
-### Audio — **in progress**
+### Audio — **standalone playback verified, integration in progress**
 
 Full plan with per-step acceptance tests in [audio.md](audio.md).
 
-- [ ] Audit the microSD card and fix the track-number-to-behaviour allocation
-- [ ] Wire the DFPlayer: 5 V, common ground, 1 kΩ on RX, bulk capacitance
-- [ ] Connect the 3 W 8 Ω speaker across SPK_1/SPK_2
-- [ ] UART driver and `audioBegin()` handshake, logged over USB serial
-- [ ] Play a track on demand at a conservative volume
-- [ ] Non-blocking playback polling — **a clip must play through without the
-      blink animation hitching**
+Verified on hardware:
+
+- [x] Connect the DFPlayer module (HW-247A) to the XIAO ESP32C3
+- [x] Connect the 3 W 8 Ω speaker across SPK_1 and SPK_2
+- [x] Prepare the microSD card
+- [x] Verify MP3 playback
+- [x] Verify sequential playback of three audio files
+
+Remaining:
+
+- [ ] Integrate audio into the main firmware
+- [ ] Replace blocking delays with `millis()`-based scheduling
+- [ ] Verify display animations during audio playback
+- [ ] Integrate the motion sensor
+- [ ] Record the as-built DFPlayer pin assignment in [wiring.md](wiring.md)
+- [ ] Measure clip durations, so a reminder interval can be chosen sensibly
+- [ ] Assign each track number to a robot behaviour
 - [ ] Measure idle and peak current draw; replace the datasheet estimates in
       [hardware.md](hardware.md) with real figures
+
+The ordering caveat: the module was proven on a standalone bench sketch before
+the build moved to the breadboard, so breadboard consolidation above is still
+open and is the immediate next task — the display and the DFPlayer need a
+shared 5 V rail and one common ground point to run together at all.
 
 ### Reminder behaviour — **planned**
 
@@ -188,13 +204,17 @@ Worth stating, because "could this do X" has a cost:
 ## Dependency graph
 
 ```
-  display + blink  (DONE)
-         |
-         v
-  breadboard consolidation
-         |
-         v
-     audio (DFPlayer) ----> reminder scheduling ----> V1 COMPLETE
+  display + blink  (DONE)          audio standalone  (DONE)
+         |                                  |
+         +----------------+-----------------+
+                          v
+              breadboard consolidation
+                          |
+                          v
+          display + audio together  <-- YOU ARE HERE
+                          |
+                          v
+     non-blocking audio in firmware ----> reminder scheduling ----> V1 COMPLETE
          |                                                  |
          |                                                  v
          |                                        presence detection (PIR)

@@ -42,16 +42,24 @@ was built, what was chosen over what, and what remains unbuilt.
 | Animated face | ✅ **Working** | Rounded-rectangle eyes, smile, white on black |
 | Blink animation | ✅ **Working** | Non-blocking, randomised interval, partial redraw, no flicker |
 | Scheduling model | ✅ **Working** | Cooperative, no `delay()` in the run loop |
-| Audio (DFPlayer Mini) | 🟠 **Integration in progress** | Parts on hand, microSD prepared, **not wired, no firmware** |
-| Reminder scheduling | ⬜ **Planned** | Depends on audio |
-| Presence detection (PIR) | ⬜ **Planned** | Sensor not wired, no firmware |
+| Audio playback | ✅ **Verified independently** | DFPlayer HW-247A over UART, speaker, microSD — proven on a standalone bench sketch |
+| Sequential MP3 playback | ✅ **Three files verified** | `/mp3/0001-0003.mp3` played by track number |
+| Display + audio integration | 🟠 **In progress** | Each subsystem works alone; **never run together**, and no audio code in the firmware |
+| Reminder scheduling | ⬜ **Planned** | Needs non-blocking playback scheduling first |
+| Motion detection (HC-SR501) | ⬜ **Planned** | Sensor not wired, no firmware |
 | Battery power | ⬜ **Planned** | Blocked on the display's backlight — see [hardware.md](docs/hardware.md) |
 | 3D printed enclosure | ⬜ **Planned** | — |
 | Multi-robot coordination | ⬜ **Planned** | V2 |
 
 > **This README distinguishes what runs from what is designed.** ✅ means
-> verified on hardware. 🟠 means parts are on hand and the design is written
-> down. ⬜ means intent only — no wiring, no code.
+> verified on hardware. 🟠 means partially proven or in progress. ⬜ means
+> intent only — no wiring, no code.
+>
+> Note the gap between "verified independently" and "integrated": the display
+> and the audio subsystem have each been proven on their own and have **never
+> been run at the same time.** The audio verification used a separate bench
+> sketch with blocking `delay()` calls; no audio code exists in the project
+> firmware yet.
 
 ---
 
@@ -81,7 +89,10 @@ frames, hold for 70 ms, and reopen — 214 ms end to end. Only the 160×72 regio
 containing the eyes is repainted, so there is no flicker and the smile never
 visibly redraws.
 
-**It makes no sound.** The speaker is not connected.
+**The firmware makes no sound.** Audio has been verified separately — the
+DFPlayer plays three MP3 files from its microSD card through the speaker — but
+that was a standalone bench sketch, not this firmware. Running the face and
+the audio together is the current milestone. See [docs/audio.md](docs/audio.md).
 
 ### Verification status
 
@@ -106,9 +117,9 @@ toolchain lives on the author's machine. See [§12](#12-setup-and-build).
 |---|---|---|---|
 | Seeed Studio XIAO ESP32C3 | 1 | USB-C | ✅ In use |
 | 2.0" 240×320 ST7789 SPI IPS TFT | 1 | 4-wire SPI | ✅ In use |
-| DFPlayer Mini MP3 module | 1 | UART 9600 8N1 | 🟠 On hand, not wired |
-| 3 W 8 Ω speaker | 1 | Differential analog | 🟠 On hand, not wired |
-| 16 GB microSD card (FAT) | 1 | Hosted by DFPlayer | 🟠 Prepared with `/mp3/NNNN.mp3` |
+| DFPlayer module (HW-247A) | 1 | UART 9600 8N1 | ✅ Wired, playback verified |
+| 3 W 8 Ω speaker | 1 | Differential analog | ✅ Connected, audio verified |
+| 16 GB microSD card (FAT) | 1 | Hosted by DFPlayer | ✅ Read by the DFPlayer, three tracks play |
 | HC-SR501 PIR sensor | 1 | Digital, 3.3 V out | ⬜ Planned |
 | Breadboard | 1 | — | Ordered, not yet incorporated |
 | Dupont jumper wires | — | — | ✅ In use |
@@ -244,9 +255,10 @@ Nothing in this section is wired or written.
 
 | Feature | Status | Blocked on |
 |---|---|---|
-| DFPlayer Mini audio playback | 🟠 Design complete, [docs/audio.md](docs/audio.md) | Breadboard consolidation, wiring |
-| Prerecorded audio reminders | ⬜ Planned | Audio subsystem |
-| Configurable reminder intervals | ⬜ Planned | Audio subsystem |
+| DFPlayer audio in the project firmware | 🟠 Verified standalone, not integrated — [docs/audio.md](docs/audio.md) | Breadboard consolidation, non-blocking port |
+| Non-blocking playback scheduling | 🟠 Next task | Replacing the bench sketch's `delay(20000)` with `millis()` scheduling |
+| Prerecorded audio reminders | ⬜ Planned | Non-blocking playback |
+| Configurable reminder intervals | ⬜ Planned | Reminder scheduler |
 | Mouth animation during playback | ⬜ Planned | Audio subsystem (BUSY signal) |
 | Expressions / moods | ⬜ Planned | Nothing — unblocked today |
 | PIR presence detection | ⬜ Planned | V1 completion |
@@ -262,7 +274,7 @@ Nothing in this section is wired or written.
 
 | Phase | Contents | State |
 |---|---|---|
-| **V1** | Animated face, audio reminders, configurable intervals, USB powered | Display done; audio in progress |
+| **V1** | Animated face, audio reminders, configurable intervals, USB powered | Display done; audio verified standalone; integration next |
 | **V1.1** | PIR presence detection, reminder suppression when away, awake/idle faces | Planned |
 | **V2** | Moods and transitions, battery, enclosure, multi-robot + central service, OTA | Planned |
 

@@ -19,19 +19,21 @@ the firmware.
 |---|---|---|---|---|
 | 1 | Seeed Studio XIAO ESP32C3 | 1 | USB-C | **Implemented** |
 | 2 | 2.0" 240x320 ST7789 SPI IPS TFT | 1 | 4-wire SPI | **Implemented** |
-| 3 | DFPlayer module (HW-247A) | 1 | UART, 9600 8N1 | **Playback verified** |
+| 3 | DFPlayer module (HW-247A) — *replacement unit* | 1 | UART, 9600 8N1 | **Playback verified** |
+| — | ~~DFPlayer Mini — *original unit*~~ | 1 | — | ❌ **Destroyed by reversed supply polarity. Retired, not reusable.** See [troubleshooting.md](troubleshooting.md) |
 | 4 | 3 W 8 Ω speaker | 1 | Analog, differential | **Playback verified** |
 | 5 | 16 GB microSD card (FAT) | 1 | Hosted by DFPlayer | **Playback verified** |
 | 6 | HC-SR501 PIR motion sensor | 1 | Digital, 3.3 V out | **Verified independently** |
-| 7 | Breadboard | 1 | — | Ordered, not yet incorporated |
+| 7 | Breadboard | 1 | — | **In use** — shared 5 V and GND rails |
 | 8 | Dupont jumper wires | — | — | In use |
 
-Everything on the implemented list is currently assembled with Dupont jumpers
-directly between modules. The display and the audio subsystem have been
-verified *separately*, each on its own; moving to the breadboard is the
-prerequisite for running them together, because sharing a 5 V rail and a
-single common ground point between three modules is not something
-jumper-to-jumper wiring distributes cleanly.
+The build has moved onto the breadboard: the XIAO feeds 5 V to the red rail
+and GND to the blue rail, and the PIR and DFPlayer both take their supply from
+those rails. Audio has played with both modules on the shared rails.
+
+The display still connects directly to the XIAO's 3V3 pin rather than the 5 V
+rail, and **has not been connected at the same time as the other two.** Each
+subsystem is verified on its own; nothing is verified operating together.
 
 ---
 
@@ -188,14 +190,15 @@ the test did *not* establish are in [wiring.md](wiring.md).
 | Supply | 4.5–20 V (5 V here) |
 | Output | Digital, ~3.3 V when triggered |
 | Adjustments | Sensitivity and hold-time trim pots, retrigger jumper |
-| Bench-test pin | D1 (GPIO3) — **verified** |
-| Production pin | D5 (GPIO7) — **proposed, unverified** |
+| Pin | D1 (GPIO3) — **verified**, now the adopted assignment |
+| Supply | Shared breadboard 5 V rail |
 
 The 3.3 V output level is directly compatible with an ESP32-C3 input, so the
-sensor needs no interface circuitry. D5 (GPIO7) remains the intended
-production pin, because D1 is also the proposed DFPlayer receive pin and the
-two cannot share it; neither pin is a strapping pin, so boot safety does not
-decide between them.
+sensor needs no interface circuitry. **D1 (GPIO3) is now the adopted pin**: it
+is not a strapping pin, so it is a safe home for a sensor that drives its
+output high at power-up, and the DFPlayer's move to D6/D7 removed the conflict
+that had made D5 preferable. Motion detection has been re-confirmed on the
+breadboard with the DFPlayer sharing the same power rails.
 
 ### Five behaviours to design around
 
@@ -231,7 +234,28 @@ this unit:
 
 ## 6. Power
 
-Current configuration: **USB-C from a host computer or wall adapter, 5 V bus.**
+Current configuration: **USB-C from a host computer or wall adapter, 5 V bus**,
+distributed to the modules over breadboard rails.
+
+```
+  USB-C  -->  XIAO ESP32C3  -->  5V pin  -->  red (+) rail  -->  PIR VCC
+                                                             -->  DFPlayer VCC
+                              -->  GND pin -->  blue (-) rail -->  PIR GND
+                                                             -->  DFPlayer GND
+                              -->  3V3 pin ----------------->  ST7789 V
+```
+
+> ### ⚠️ Reversing these two rails destroyed a DFPlayer Mini on this build
+>
+> The module emitted smoke and was retired. None of the modules in this
+> project has reverse-polarity protection — the DFPlayer Mini, the HC-SR501,
+> and the display are all bare breakout boards, and the XIAO's USB input is
+> the only protected supply in the build. A reversed rail reverse-biases
+> **every** module on it at once.
+>
+> Connect the rails with nothing attached, confirm polarity with a meter, then
+> add modules one at a time. Full account in
+> [troubleshooting.md](troubleshooting.md).
 
 | Consumer | Rail | Rough draw | Notes |
 |---|---|---|---|
@@ -254,13 +278,21 @@ PIR from 5 V instead of leaning on it.
 
 ## 7. Assembly notes
 
+- **Confirm breadboard rail polarity with a meter before seating a single
+  module.** This is the check that would have saved a DFPlayer Mini on this
+  build; it takes five seconds. Breadboard rails have no polarity key — the
+  red and blue stripes are a convention, not a physical constraint.
 - All modules must share a common ground. Every signal in this project is
   referenced to it, and a missing ground presents as a display that works and
   a UART that silently does not.
 - Wire power before signals and verify 3V3 and 5 V with a meter before
   connecting a module, so a wiring slip burns a jumper instead of the panel.
+- Add modules one at a time, confirming the display still runs after each, so
+  a fault is attributable to the module that introduced it.
 - The display's SCL/SDA labels are I2C names on an SPI device. SCL is the SPI
   clock, SDA is MOSI. Wiring them to the XIAO's I2C pins (D4/D5) because the
   names match would produce a dead display.
 
-See [wiring.md](wiring.md) for the exact connection tables.
+See [wiring.md](wiring.md) for the exact connection tables and
+[troubleshooting.md](troubleshooting.md) for the incident log and fault
+symptoms.

@@ -42,14 +42,14 @@ was built, what was chosen over what, and what remains unbuilt.
 | Animated face | ✅ **Working** | Rounded-rectangle eyes, smile, white on black |
 | Blink animation | ✅ **Working** | Non-blocking, randomised interval, partial redraw, no flicker |
 | Scheduling model | ✅ **Working** | Cooperative, no `delay()` in the run loop |
-| Audio playback | ✅ **Verified independently** | DFPlayer HW-247A over UART, speaker, microSD — proven on a standalone bench sketch |
-| Sequential MP3 playback | ✅ **Three files verified** | `/mp3/0001-0003.mp3` played by track number |
-| Display + audio integration | 🟠 **In progress** | Each subsystem works alone; **never run together**, and no audio code in the firmware |
-| Reminder scheduling | ⬜ **Planned** | Needs non-blocking playback scheduling first |
-| Motion detection | ✅ **Verified independently** | HC-SR501 successfully tested with XIAO D1; main firmware integration pending |
-| PIR integration into firmware | ⬜ **Not implemented** | Production pin D5 unverified; D1 collides with the proposed DFPlayer pin |
-| Motion-triggered reminders | ⬜ **Not implemented** | Needs PIR integration |
-| Breadboard consolidation | ⬜ **Not completed** | Prerequisite for running any two subsystems together |
+| DFPlayer audio playback | ✅ **Verified independently** | HW-247A over UART, speaker, microSD — standalone bench sketch |
+| Sequential MP3 playback | ✅ **Three files verified** | `/mp3/0001-0003.mp3` played by track number, commands 20 s apart |
+| Motion detection | ✅ **Verified independently** | HC-SR501 on D1, reported over serial |
+| Breadboard power distribution | ✅ **Verified** | Shared 5 V / GND rails; audio played with the PIR on the same rails |
+| Motion-triggered audio | 🟠 **In progress** | Firmware written for the modular architecture; **not yet run on hardware** |
+| Display + audio + motion together | ⬜ **Not tested** | No two subsystems have operated together |
+| Reminder scheduling | ⬜ **Planned** | Interval-driven reminders, after motion-triggered audio works |
+| Long-running stability | ⬜ **Not tested** | Nothing has been left running for an extended period |
 | Battery power | ⬜ **Planned** | Blocked on the display's backlight — see [hardware.md](docs/hardware.md) |
 | 3D printed enclosure | ⬜ **Planned** | — |
 | Multi-robot coordination | ⬜ **Planned** | V2 |
@@ -59,11 +59,11 @@ was built, what was chosen over what, and what remains unbuilt.
 > intent only — no wiring, no code.
 >
 > Note the gap between "verified independently" and "integrated". Three
-> subsystems now work — display, audio, and motion detection — but **only the
-> display runs in the project firmware.** Audio and the PIR were each proven
-> on separate bench sketches, using blocking `delay()` calls that the
-> firmware's scheduling model does not permit, and **no two subsystems have
-> ever been run at the same time.**
+> subsystems work — display, audio, and motion detection — each proven on its
+> own. **No two of them have been verified operating together.** The PIR and
+> the DFPlayer have shared breadboard power rails, which proves the supply
+> holds up, not that the subsystems cooperate. The display has never been
+> connected alongside the other two.
 
 ---
 
@@ -121,15 +121,20 @@ toolchain lives on the author's machine. See [§12](#12-setup-and-build).
 |---|---|---|---|
 | Seeed Studio XIAO ESP32C3 | 1 | USB-C | ✅ In use |
 | 2.0" 240×320 ST7789 SPI IPS TFT | 1 | 4-wire SPI | ✅ In use |
-| DFPlayer module (HW-247A) | 1 | UART 9600 8N1 | ✅ Wired, playback verified |
+| DFPlayer module (HW-247A) | 1 | UART 9600 8N1 | ✅ Wired, playback verified *(replacement unit — see [troubleshooting.md](docs/troubleshooting.md))* |
 | 3 W 8 Ω speaker | 1 | Differential analog | ✅ Connected, audio verified |
 | 16 GB microSD card (FAT) | 1 | Hosted by DFPlayer | ✅ Read by the DFPlayer, three tracks play |
 | HC-SR501 PIR sensor | 1 | Digital, 3.3 V out | ✅ Motion detection verified |
-| Breadboard | 1 | — | Ordered, not yet incorporated |
+| Breadboard | 1 | — | ✅ In use — shared 5 V / GND rails |
 | Dupont jumper wires | — | — | ✅ In use |
 
 Full electrical notes, GPIO constraints, and the power budget:
 **[docs/hardware.md](docs/hardware.md)**
+
+> ⚠️ **Reversing the breadboard's 5 V and GND rails destroyed a DFPlayer Mini
+> on this build.** None of these modules has reverse-polarity protection.
+> Confirm rail polarity with a meter before seating anything —
+> [docs/troubleshooting.md](docs/troubleshooting.md).
 
 ---
 
@@ -290,7 +295,9 @@ hours without a reset.
 Dependency ordering, exit criteria, backlog, and explicit non-goals:
 **[docs/project-roadmap.md](docs/project-roadmap.md)**
 
-All engineering documentation is indexed at **[docs/](docs/README.md)**.
+All engineering documentation is indexed at **[docs/](docs/README.md)**, and
+faults hit along the way are logged in
+**[docs/troubleshooting.md](docs/troubleshooting.md)**.
 
 ---
 
@@ -314,6 +321,7 @@ Desk-Buddy/
     ├── display.md                ST7789 config, animation architecture
     ├── audio.md                  DFPlayer integration plan (not implemented)
     ├── project-roadmap.md        phases, exit criteria, non-goals
+    ├── troubleshooting.md        incident log and fault symptoms
     └── media/                    photos and GIFs (none captured yet)
 ```
 

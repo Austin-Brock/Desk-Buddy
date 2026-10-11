@@ -6,7 +6,45 @@ record of a working circuit.
 
 ---
 
-## 1. Display — ST7789 → XIAO ESP32C3 · **Implemented and verified**
+> ## ⚠️ Rail polarity — read before connecting anything
+>
+> Reversing the XIAO's 5 V and GND connections to the breadboard rails
+> **destroyed a DFPlayer Mini on this build.** The module emitted smoke and
+> was retired. Breadboard rails carry no polarity key — the red and blue
+> stripes are a convention, nothing physically prevents landing the supply
+> backwards, and when it is backwards every module on those rails is
+> reverse-biased at once.
+>
+> **Connect the rails first with no modules attached, confirm polarity with a
+> meter, then add modules one at a time.** Full account in
+> [troubleshooting.md](troubleshooting.md).
+
+---
+
+## 1. Power distribution — XIAO → breadboard rails · **In use**
+
+| XIAO pin | Breadboard rail |
+|---|---|
+| 5V | Red (+) rail |
+| GND | Blue (−) rail |
+
+```
+   XIAO ESP32C3
+  +--------------+
+  |           5V |------------> red (+) rail  ====================
+  |          GND |------------> blue (-) rail ====================
+  +--------------+                                |          |
+                                            HC-SR501     DFPlayer
+                                               VCC/GND    VCC/GND
+```
+
+The PIR and the DFPlayer both take VCC and GND from these shared rails, and
+both have been exercised with that arrangement. The display remains on the
+XIAO's 3V3 pin, not the 5 V rail.
+
+---
+
+## 2. Display — ST7789 → XIAO ESP32C3 · **Implemented and verified**
 
 This is the wiring the robot currently runs on.
 
@@ -56,67 +94,71 @@ Two mistakes this table is written to prevent:
 
 ---
 
-## 2. Audio — DFPlayer → XIAO ESP32C3 · **Wired and playing; as-built pins not yet recorded**
+## 3. Audio — DFPlayer → XIAO ESP32C3 · **Verified independently**
 
 The DFPlayer (board marking **HW-247A**) is wired and playback is verified:
 three MP3 files played from the microSD card through the speaker. See
 [audio.md](audio.md).
 
-> **This table is still the *proposed* wiring, not a record of the verified
-> build.** The pin assignment and series resistance actually used have not
-> been confirmed, so they have not been marked verified here. Confirming them
-> is an open item in [audio.md §9](audio.md#9-open-questions).
+> **This is the replacement module.** The original DFPlayer Mini was destroyed
+> by a reversed breadboard supply and has been retired — see
+> [troubleshooting.md](troubleshooting.md). All audio results in this
+> repository refer to the replacement.
 
-| DFPlayer pin | XIAO pin | GPIO | Notes |
-|---|---|---|---|
-| VCC | 5V | — | USB bus voltage; **not** the 3V3 rail |
-| GND | GND | — | Direct to XIAO ground, not daisy-chained via the display |
-| RX | D3 | 5 | MCU transmit → module receive, **via 1 kΩ series resistor** |
-| TX | D1 | 3 | Module transmit → MCU receive |
-| SPK_1 | — | — | Speaker + (differential — do not ground) |
-| SPK_2 | — | — | Speaker − (differential — do not ground) |
-| BUSY | *optional* | — | Low while playing; useful later for gating animation |
+### As-built wiring
+
+| DFPlayer pin | XIAO pin | GPIO | Status | Notes |
+|---|---|---|---|---|
+| VCC | 5 V rail | — | **Verified** | Shared breadboard rail; **not** the 3V3 rail |
+| GND | GND rail | — | **Verified** | Shared breadboard rail |
+| RX | **D7** | 20 | **Verified** | MCU transmit → module receive |
+| TX | **D6** | 21 | *Unconfirmed* | Module transmit → MCU receive. Not listed in the as-built notes; one-way control works without it |
+| SPK_1 | — | — | **Verified** | Speaker **red** (differential — do not ground) |
+| SPK_2 | — | — | **Verified** | Speaker **black** (differential — do not ground) |
+| BUSY | *not connected* | — | — | Low while playing; not used yet |
 
 ```
-   XIAO ESP32C3                          DFPlayer Mini
+   XIAO ESP32C3                          DFPlayer HW-247A
   +--------------+                      +---------------+
-  |           5V |----------------------| VCC           |
-  |          GND |----------------------| GND           |
-  |   D3  (GPIO5)|------[ 1k ohm ]------| RX            |
-  |   D1  (GPIO3)|----------------------| TX            |
+  |           5V |---> red (+) rail --->| VCC           |
+  |          GND |---> blue (-) rail -->| GND           |
+  |  D7 (GPIO20) |----------------------| RX            |
+  |  D6 (GPIO21) |- - - - - - - - - - - | TX  (unconfirmed)
   +--------------+                      |               |
                                         | SPK_1  SPK_2  |
                                         +---+-------+---+
-                        100 uF bulk cap     |       |
-                        across VCC/GND    +-+-------+-+
+                                            |       |
+                                          +-+-------+-+
                                           | 3W 8ohm   |
-                                          | speaker   |
+                                          | red  black|
                                           +-----------+
 ```
 
-Design notes behind these choices:
+### Three notes on this as-built wiring
 
-- **D1/D3 rather than the default UART0 pins (D6/D7).** The ESP32-C3 routes
-  UARTs through its GPIO matrix, so a second UART can be assigned to almost
-  any pins. Keeping off GPIO20/21 avoids any contention with the default
-  console UART, which matters because debugging audio integration over the
-  serial monitor is exactly when a pin conflict would be most confusing.
-- **Neither pin is a strapping pin.** The module drives its TX line at
-  power-on; pointing that at GPIO2, 8 or 9 could alter the boot mode.
-- **1 kΩ in series with DFPlayer RX.** Standard practice with this module; it
-  limits current into the input and reduces the UART hiss that otherwise
-  couples into the amplifier.
-- **5 V, not 3V3.** The amplifier's current peaks (~600 mA into 8 Ω) do not
-  belong on the XIAO's small onboard regulator.
-- **Ground goes straight to the XIAO.** Sharing a return wire with the display
-  puts SPI switching current through the amplifier's ground reference, which
-  makes the SPI clock audible in the speaker.
+- **⚠️ D6/D7 are the ESP32-C3's default UART0 pins** (GPIO21 = TX,
+  GPIO20 = RX), which is also where the Arduino serial console lands **if
+  "USB CDC On Boot" is disabled.** With USB CDC enabled, `Serial` goes over
+  the native USB port and these pins are free for a second UART — which is
+  how the firmware configures them. If the console is ever moved back to
+  UART0, the DFPlayer traffic and the serial monitor will collide on the same
+  two pins. Enable "USB CDC On Boot".
+- **This resolves the earlier D1 collision.** An earlier revision of this
+  document proposed the DFPlayer on D1/D3, which clashed with the PIR's
+  as-built pin. With the DFPlayer on D6/D7 the PIR keeps D1 and nothing
+  overlaps.
+- **The 1 kΩ series resistor on RX and the bulk capacitor across VCC were
+  recommended in the original design; whether they are present in the
+  as-built circuit is unrecorded.** Both are noise and transient mitigations
+  rather than functional requirements, which is consistent with playback
+  working without them, but they remain worth adding before the amplifier
+  shares a board with the display's SPI lines.
 
 See [audio.md](audio.md) for the protocol and the microSD layout.
 
 ---
 
-## 3. Presence detection — HC-SR501 PIR → XIAO ESP32C3 · **Verified independently**
+## 4. Presence detection — HC-SR501 PIR → XIAO ESP32C3 · **Verified independently**
 
 Motion detection is verified on hardware with a standalone bench sketch. The
 PIR is **not** in the project firmware, and it has never been run alongside
@@ -126,21 +168,23 @@ the display or the DFPlayer.
 
 | HC-SR501 pin | XIAO pin | GPIO | Notes |
 |---|---|---|---|
-| VCC | 5V | — | Module needs 4.5 V or more |
-| GND | GND | — | Common ground |
+| VCC | 5 V rail | — | Shared breadboard rail; module needs 4.5 V or more |
+| GND | GND rail | — | Shared breadboard rail |
 | OUT | **D1** | **3** | ~3.3 V when triggered; safe for an ESP32-C3 input |
 
 ```
    XIAO ESP32C3                       HC-SR501 PIR
   +--------------+                   +--------------+
-  |           5V |-------------------| VCC          |
-  |          GND |-------------------| GND          |
+  |           5V |---> red rail ---->| VCC          |
+  |          GND |---> blue rail --->| GND          |
   |   D1  (GPIO3)|-------------------| OUT          |
   +--------------+                   +--------------+
                                       sensitivity + hold-time
                                       trim pots, retrigger jumper
-            as-built bench test -- not the production pin
 ```
+
+Motion detection has been re-confirmed with this breadboard arrangement, with
+the DFPlayer sharing the same power rails.
 
 The bench sketch configured D1 as a digital input and printed to the Serial
 Monitor at 115200 baud whenever the sensor's output changed state. Observed
@@ -156,28 +200,16 @@ No motion.
 That confirms the sensor drives clean HIGH/LOW transitions into an ESP32-C3
 GPIO input. It confirms nothing about timing, sensitivity, or reliability.
 
-### ⚠️ D1 collides with the proposed DFPlayer wiring
+### D1 is now the adopted pin — the earlier collision is resolved
 
-**D1 (GPIO3) is the pin this document proposes for DFPlayer TX → MCU RX**
-(section 2 above).
-The bench test was run in isolation, so nothing conflicted at the time, but
-the PIR and the audio module cannot both have D1 in the assembled robot.
+An earlier revision of this document proposed the DFPlayer on D1/D3, which
+clashed with the PIR's as-built pin. **The DFPlayer is now wired on D6/D7**
+(section 3), so nothing contends for D1 and the PIR keeps it.
 
-This is an argument for keeping the production PIR input on D5 rather than
-adopting the bench pin, and it is also a reason the as-built DFPlayer pins
-need recording: if the verified audio build actually used D1 for something,
-the collision is already real rather than hypothetical.
-
-### Production pin allocation
-
-**D5 (GPIO7) remains the proposed production PIR input. The D5 configuration
-has not been verified.**
-
-D5 is preferred over the bench pin for two reasons: it avoids the DFPlayer
-collision above, and neither pin is a strapping pin — the sensor drives its
-output high on motion, including during power-up, and a strapping pin must
-never be exposed to that. GPIO3 happens to be safe on that count too, so the
-collision is the deciding factor, not boot safety.
+D5 (GPIO7) was the originally proposed production PIR input and is **no longer
+needed**; it stays free. D1 (GPIO3) is not a strapping pin, so it is a safe
+home for a sensor that drives its output high at power-up — the same property
+that made D5 acceptable.
 
 ### Unknown hardware settings
 
@@ -195,57 +227,93 @@ the sensor behaves in firmware:
 
 ### Integration status
 
-- Not in the project firmware; standalone bench sketch only.
-- Never run alongside the display or the DFPlayer.
+- Breadboard consolidation is **done**: the PIR and the DFPlayer share the 5 V
+  and GND rails, and audio played with both connected.
+- Motion detection and audio playback have **not** been demonstrated
+  responding to each other — sharing power is not the same as working
+  together.
+- **The display has never been connected at the same time as these two.**
 - The bench sketch read the pin with a raw `digitalRead()` and no debouncing,
   and paced its loop with `delay(100)` — acceptable on the bench, not
   acceptable in the firmware's non-blocking run loop.
-- Breadboard consolidation is not done, so there is still no shared 5 V rail
-  or single common ground point for three modules.
 
 ---
 
-## 4. Pin allocation summary
+## 5. Pin allocation summary
 
 | XIAO | GPIO | Assigned to | Status |
 |---|---|---|---|
 | D0 | 2 | Display CS | **Verified** |
-| D1 | 3 | DFPlayer TX → MCU RX *(proposed)* / PIR OUT *(bench test, as built)* | ⚠️ **Collision** — see section 3 |
+| D1 | 3 | PIR OUT | **Verified** |
 | D2 | 4 | Display DC | **Verified** |
-| D3 | 5 | MCU TX → DFPlayer RX | **Proposed** — as-built pin not yet confirmed |
+| D3 | 5 | *free* | — |
 | D4 | 6 | *free* | — |
-| D5 | 7 | PIR OUT | **Proposed production pin** — unverified |
-| D6 | 21 | *free* (default UART0 TX) | — |
-| D7 | 20 | *free* (default UART0 RX) | — |
+| D5 | 7 | *free* | — |
+| D6 | 21 | MCU RX ← DFPlayer TX (default UART0 TX pin) | *Unconfirmed* — may not be wired |
+| D7 | 20 | MCU TX → DFPlayer RX (default UART0 RX pin) | **Verified** |
 | D8 | 8 | Display SCL (SPI SCK) | **Verified** |
 | D9 | 9 | *reserved* — BOOT button, strapping pin | avoid |
 | D10 | 10 | Display SDA (SPI MOSI) | **Verified** |
 
-With the display, audio, and PIR all connected on their intended pins, three
-pins (D4, D6, D7) remain free for expansion.
+No pin is contended. Three pins (D3, D4, D5) are free for expansion — D5 was
+previously reserved for the PIR and is released now that the sensor is settled
+on D1.
 
-The D1 row is the one unresolved assignment: it is the proposed DFPlayer
-receive pin *and* the pin the PIR bench test actually used. Resolving it means
-recording the as-built DFPlayer wiring and moving the PIR to D5.
+Every assignment above has been verified *individually*. **No two of the three
+subsystems have been verified operating together**, and the display has never
+shared the board with the other two.
 
 ---
 
-## 5. Bring-up checklist
+## 6. What has been tested together, and what has not
 
-For reproducing the current build from parts:
+The distinction matters more than the individual pin tables, because every
+remaining risk in this project lives in the interactions.
 
-1. Connect GND and 3V3 from the XIAO to the display's G and V. Confirm 3.3 V
-   at the panel header with a meter before going further.
-2. Connect SCL → D8, SDA → D10, DC → D2, CS → D0. Leave RST unconnected.
-3. Flash the sketch at `firmware/desk-buddy/` (see the README for the toolchain
-   setup).
-4. Open the serial monitor at 115200 baud. The boot banner reports the pin map
+| Combination | State |
+|---|---|
+| Display alone | ✅ Verified — runs in the project firmware |
+| DFPlayer alone | ✅ Verified — three tracks played |
+| PIR alone | ✅ Verified — motion reported over serial |
+| PIR + DFPlayer **sharing power rails** | ✅ Verified — audio played with both on the rails |
+| PIR + DFPlayer **interacting** (motion triggers audio) | ⬜ Firmware written, **never run** |
+| Display + DFPlayer | ⬜ Never connected together |
+| Display + PIR | ⬜ Never connected together |
+| **All three together** | ⬜ Never connected together — the full-system goal |
+
+Sharing power rails is not the same as working together: it proves the supply
+holds up with two modules attached, not that the firmware can service both
+while animating a face.
+
+---
+
+## 7. Bring-up checklist
+
+For reproducing the current build from parts. **Steps 1 and 2 are the ones
+that cost a DFPlayer Mini when skipped** — see
+[troubleshooting.md](troubleshooting.md).
+
+1. **Rails first, nothing else attached.** XIAO 5 V → red (+) rail,
+   GND → blue (−) rail.
+2. **Confirm polarity with a meter before seating any module.** Red probe on
+   the red rail, black on the blue; the reading must be positive, about 5 V.
+3. Connect GND and 3V3 from the XIAO to the display's G and V. Confirm 3.3 V
+   at the panel header before going further. The display runs from 3V3, not
+   the 5 V rail.
+4. Connect SCL → D8, SDA → D10, DC → D2, CS → D0. Leave RST unconnected.
+5. Add the remaining modules **one at a time**, checking the display still
+   runs after each: PIR (VCC/GND to the rails, OUT → D1), then the DFPlayer
+   (VCC/GND to the rails, RX → D7, speaker across SPK_1/SPK_2).
+6. Flash the sketch at `firmware/desk-buddy/` (see the README for the
+   toolchain setup). Ensure **"USB CDC On Boot" is enabled**, or the serial
+   console will contend with the DFPlayer on D6/D7.
+7. Open the serial monitor at 115200 baud. The boot banner reports the pin map
    and the initialised resolution.
-5. Expected result: the backlight is on, the screen is black, two white
+8. Expected result: the backlight is on, the screen is black, two white
    rounded-rectangle eyes and a white smile are drawn, and the eyes blink
    every few seconds.
 
-If the screen stays white or blank: check that SCL is on D8 and SDA on D10,
-and that the panel is on 3V3 rather than 5 V. There is no read-back path on
-this module, so the firmware cannot detect or report a wiring fault — all
-diagnosis here is visual.
+Fault symptoms and what to check for each are collected in
+[troubleshooting.md](troubleshooting.md). Note that there is no read-back path
+on the display module, so the firmware cannot detect or report a wiring fault
+— all display diagnosis is visual.

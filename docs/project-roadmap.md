@@ -14,7 +14,7 @@ dependency instead: each phase unblocks the next.
 |---|---|
 | **Working** | ST7789 display bring-up, minimalist face, non-blocking randomised blink animation |
 | **Working, separately** | DFPlayer audio: three MP3 files played sequentially from microSD through the speaker. HC-SR501 PIR: clean motion HIGH/LOW transitions reported over serial. Both verified on standalone bench sketches, **neither** in the project firmware |
-| **In progress** | Running display and audio together, and porting the audio code into the firmware with non-blocking scheduling |
+| **In progress** | Motion-triggered audio: firmware written for the modular architecture, **not yet run on hardware**. Display, audio, and motion have never operated together |
 | **Planned next** | Reminder scheduling, then presence detection |
 | **Power** | USB-C only |
 | **Enclosure** | None — bare modules on jumper wires |
@@ -34,15 +34,20 @@ something useful at intervals you chose.
 - [x] Randomised blink interval so the robot does not read as a metronome
 - [x] Cooperative scheduling model established — no `delay()` in the run loop
 
-### Hardware consolidation — **next**
+### Hardware consolidation — **partly done**
 
-- [ ] Move from Dupont-jumper-to-module wiring onto the breadboard
-- [ ] Shared 5 V rail and a single common ground point
+- [x] Move from Dupont-jumper-to-module wiring onto the breadboard
+- [x] Shared 5 V rail and a single common ground point
+- [x] Shared breadboard power tested with the PIR and the DFPlayer together
+- [ ] Reconnect the display to the shared build
 - [ ] Verify the display still runs unchanged after the move
 
-This is first because the audio module needs a 5 V rail and a clean ground
-that module-to-module jumpers cannot provide. See
-[hardware.md](hardware.md).
+The PIR and the DFPlayer now share the rails and audio plays with both
+attached. The display has not been brought onto the shared build yet, so the
+three-module arrangement the enclosure will need has never existed. See
+[hardware.md](hardware.md), and
+[troubleshooting.md](troubleshooting.md) for the reversed-polarity incident
+during this consolidation.
 
 ### Audio — **standalone playback verified, integration in progress**
 
@@ -60,6 +65,7 @@ Remaining:
 
 - [ ] Integrate audio into the main firmware
 - [ ] Replace blocking delays with `millis()`-based scheduling
+- [ ] Confirm whether the 1 kΩ RX resistor and VCC bulk capacitor are fitted
 - [ ] Verify display animations during audio playback
 - [ ] Integrate the motion sensor
 - [ ] Record the as-built DFPlayer pin assignment in [wiring.md](wiring.md)
@@ -69,9 +75,9 @@ Remaining:
       [hardware.md](hardware.md) with real figures
 
 The ordering caveat: the module was proven on a standalone bench sketch before
-the build moved to the breadboard, so breadboard consolidation above is still
-open and is the immediate next task — the display and the DFPlayer need a
-shared 5 V rail and one common ground point to run together at all.
+the build moved to the breadboard. Consolidation has since happened for the
+PIR and the DFPlayer; the display has not been brought onto the shared build,
+so the three-module arrangement still does not exist.
 
 ### Reminder behaviour — **planned**
 
@@ -108,10 +114,9 @@ Verified on hardware:
 
 Remaining:
 
+- [x] Resolve the D1 pin conflict — DFPlayer moved to D6/D7, PIR keeps D1
 - [ ] Confirm the retrigger jumper configuration (H or L)
 - [ ] Measure the output HIGH duration, and record the trim pot positions
-- [ ] Resolve the D1 collision with the proposed DFPlayer receive pin
-- [ ] Verify the production pin D5 (GPIO7)
 - [ ] Integrate the PIR into the project firmware, non-blocking
 - [ ] Verify the blink animation still runs during motion detection
 - [ ] Test false-trigger behaviour
@@ -129,6 +134,21 @@ hold-time tuning cannot paper over it, the answer is a different sensor, not
 more firmware.
 
 - [ ] Evaluate an mmWave presence sensor (e.g. LD2410) as a replacement
+
+### Motion-triggered audio — **firmware written, never run**
+
+A combined behaviour: a new motion event plays the next of the three clips in
+rotation, with a 20-second cooldown so a single person moving at a desk does
+not retrigger it continuously.
+
+- [ ] **Run the motion-triggered audio firmware on hardware.** Nothing below
+      can be assessed until this happens
+- [ ] Verify the blink animation stays smooth while a clip plays
+- [ ] Confirm the cooldown behaves as intended across repeated triggers
+- [ ] Decide whether to wire the DFPlayer BUSY pin for completion polling
+- [ ] Long-running stability test
+- [ ] Reminder scheduling proper — interval-driven rather than motion-driven
+- [ ] Enclosure design
 
 ### Sequencing note
 
@@ -233,19 +253,24 @@ Worth stating, because "could this do X" has a cost:
 ## Dependency graph
 
 ```
-  display + blink  (DONE)          audio standalone  (DONE)
-         |                                  |
-         +----------------+-----------------+
-                          v
-              breadboard consolidation
-                          |
-                          v
-          display + audio together  <-- YOU ARE HERE
-            (or display + PIR first;
-             see the sequencing note)
-                          |
-                          v
-     non-blocking audio in firmware ----> reminder scheduling ----> V1 COMPLETE
+  display + blink      audio standalone      PIR standalone
+     (DONE)                  (DONE)               (DONE)
+        |                       |                    |
+        |                       +---------+----------+
+        |                                 v
+        |                   breadboard: shared 5V/GND rails
+        |                        with PIR + DFPlayer  (DONE)
+        |                                 |
+        |                                 v
+        |                   motion-triggered audio firmware
+        |                     (WRITTEN, NEVER RUN)  <-- YOU ARE HERE
+        |                                 |
+        +----------------+----------------+
+                         v
+         all three on one build: display + audio + motion
+                         |
+                         v
+            reminder scheduling ----> stability test ----> V1 COMPLETE
          |                                                  |
          |                                                  v
          |                                        presence detection (PIR)

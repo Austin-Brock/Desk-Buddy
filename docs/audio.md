@@ -26,7 +26,10 @@
 ### Verified functionality
 
 - DFPlayer module (board marking **HW-247A**, a DFPlayer Mini variant)
-  connected to the XIAO ESP32C3.
+  connected to the XIAO ESP32C3. **This is a replacement unit** — the original
+  DFPlayer Mini was destroyed by a reversed breadboard supply and has been
+  retired. See [troubleshooting.md](troubleshooting.md). Every result below
+  refers to the replacement.
 - UART communication operating at 9600 baud.
 - 3 W 8 Ω speaker connected across SPK_1 and SPK_2.
 - microSD card successfully read by the DFPlayer.
@@ -36,6 +39,11 @@
   - `/mp3/0003.mp3`
 - 20-second intervals between playback commands.
 - Audio playback completed successfully.
+- Module powered from the **shared breadboard 5 V rail**, with the HC-SR501
+  PIR connected to the same rails. Audio played with both modules on the
+  supply.
+- UART on **D7** (GPIO20) carrying MCU transmit → DFPlayer RX. See
+  [wiring.md](wiring.md).
 
 ### What the 20 seconds actually means
 
@@ -50,6 +58,17 @@ this test ruled out.
 This distinction matters for the reminder scheduler: a reminder interval has
 to be measured from playback *completion*, polled via the BUSY signal or a
 status query, not from the previous command.
+
+### What sharing power rails does and does not prove
+
+The PIR and the DFPlayer were on the same 5 V and GND rails while audio
+played. That establishes the supply holds up with both modules attached — a
+real result, given the amplifier's current peaks.
+
+It does **not** establish that the two subsystems work together: nothing in
+the test had motion trigger audio, and the firmware servicing both while
+animating a face is a different question again. **The display was not
+connected.**
 
 ### Implementation details
 
@@ -285,16 +304,15 @@ its test passes on hardware.
 | ✅ | 4 | Speaker across SPK_1/SPK_2 | Audio audible through the speaker |
 | ✅ | 5 | UART driver and handshake | Module accepts commands at 9600 baud |
 | ✅ | 6 | Play a track at a set volume | Three clips played sequentially |
-| ⬜ | 2 | Move the build to the breadboard; shared 5 V rail and common ground | Display still runs; 5 V and 3V3 confirmed with a meter |
+| ✅ | 2 | Move the build to the breadboard; shared 5 V rail and common ground | PIR and DFPlayer both on the rails; audio played. **Display not yet reconnected to the shared build** |
 | ⬜ | 7 | Port the audio code into the firmware as `audioUpdate()` with non-blocking completion polling | A clip plays through while the eyes keep blinking on schedule, with no visible hitch in the animation |
 | ⬜ | 8 | Reminder scheduler: configurable interval, selects a clip | A reminder fires on its interval while the face animates normally |
 | ⬜ | 9 | Measure current draw at idle and at playback peak | Figures recorded in [hardware.md](hardware.md), replacing the datasheet estimates |
 
-Steps 3–6 were completed out of order with step 2: the module was proven on a
-standalone bench sketch before the build moved to the breadboard. Step 2 is
-therefore still open, and it is now the immediate next task, because the
-display and the DFPlayer need a shared 5 V rail and a single common ground
-point to run together at all.
+Steps 3–6 were completed out of order with step 2 — the module was proven on a
+standalone bench sketch before the build moved to the breadboard — and step 2
+has since been done for the PIR and the DFPlayer. The display has not been
+brought onto the shared build yet, which is what step 7 now requires.
 
 **Step 7 is the one that actually matters.** Steps 1–6 proved the module
 works. Step 7 proves the two subsystems coexist, which is the real question
@@ -320,10 +338,15 @@ scheduling.
 
 ## 9. Open questions
 
-- **Which pins and what series resistance does the verified build actually
-  use?** The wiring tables in this document and in [wiring.md](wiring.md) are
-  still the *proposed* assignment (D3 → RX via 1 kΩ, D1 ← TX). The as-built
-  wiring must be recorded before those tables can be marked verified.
+- **Is the 1 kΩ series resistor on DFPlayer RX present in the as-built
+  circuit, and is there bulk capacitance across VCC?** Both were in the
+  original design and neither is recorded. They are noise and transient
+  mitigations rather than functional requirements — consistent with playback
+  working — but they matter once the amplifier shares a board with the
+  display's SPI lines. *(The pin assignment question is now answered: RX on
+  D7, verified.)*
+- **Is the DFPlayer's TX line connected to D6 at all?** One-way control works
+  without it, but status queries and completion polling need it.
 - **What volume value was used**, and what is the actual current draw at that
   volume?
 - **How long is each clip?** Needed before any reminder interval can be

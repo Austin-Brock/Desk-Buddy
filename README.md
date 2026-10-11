@@ -93,10 +93,13 @@ frames, hold for 70 ms, and reopen — 214 ms end to end. Only the 160×72 regio
 containing the eyes is repainted, so there is no flicker and the smile never
 visibly redraws.
 
-**The firmware makes no sound.** Audio has been verified separately — the
-DFPlayer plays three MP3 files from its microSD card through the speaker — but
-that was a standalone bench sketch, not this firmware. Running the face and
-the audio together is the current milestone. See [docs/audio.md](docs/audio.md).
+**Whether it makes a sound is now an open question rather than a no.** The
+firmware contains a motion-triggered audio behaviour — a new motion event
+plays the next of three clips, with a 20-second cooldown — but **it has never
+been run on hardware.** The DFPlayer and the PIR were each proven separately
+with bench sketches; this firmware combining them with the animation is
+written and unverified. See [docs/audio.md](docs/audio.md) and the
+[roadmap](docs/project-roadmap.md).
 
 ### Verification status
 
@@ -148,10 +151,15 @@ Full electrical notes, GPIO constraints, and the power budget:
 | Graphics | [Adafruit GFX Library](https://github.com/adafruit/Adafruit-GFX-Library) |
 | Display driver | [Adafruit ST7735 and ST7789 Library](https://github.com/adafruit/Adafruit-ST7735-Library) |
 | Bus | `SPI` (Arduino core) |
-| Planned | `DFRobotDFPlayerMini` for audio — not yet a dependency |
+| Audio | **No library** — DFPlayer command frames assembled directly in `audio.cpp` |
 
 The firmware is split into an entry point, a configuration header, and one
 module per layer; see [§11](#11-repository-structure).
+
+The DFPlayer protocol is ten bytes with a checksum and this firmware uses two
+of its commands, so a library dependency would cost more than it saves. The
+frame format is documented in [docs/audio.md](docs/audio.md) and verified
+against published reference frames.
 
 Why Adafruit GFX rather than a faster alternative such as TFT_eSPI: the face
 is a handful of filled primitives, not a sprite engine. GFX is the better
@@ -256,6 +264,25 @@ Everything in this section runs on hardware today.
 - **Serial boot diagnostics** at 115200 baud reporting the pin map and the
   initialised resolution.
 
+### Implemented but **not yet verified on hardware**
+
+Written against the modular architecture and statically checked, but never
+run. Do not read this as a feature list.
+
+- **PIR motion input** (`motion.cpp`) — 20 ms polling, rising-edge detection,
+  a 150 ms edge guard that discards glitches while merely delaying genuine
+  transitions, and a 60-second sensor warm-up window during which events are
+  discarded.
+- **DFPlayer audio output** (`audio.cpp`) — UART1 on D7/D6, command frames
+  assembled directly with checksums verified against published reference
+  frames, a 2-second post-power-up readiness window, and command pacing. Not
+  blocking: `write()` hands bytes to the UART buffer and returns.
+- **Motion-triggered audio behaviour** (`desk-buddy.ino`) — a new motion
+  event plays the next of three clips in rotation, with a 20-second cooldown
+  measured from the command being sent. Triggers during the cooldown are
+  discarded rather than deferred, so the robot never reacts to movement from
+  twenty seconds ago.
+
 ---
 
 ## 9. Planned features
@@ -264,14 +291,12 @@ Nothing in this section is wired or written.
 
 | Feature | Status | Blocked on |
 |---|---|---|
-| DFPlayer audio in the project firmware | 🟠 Verified standalone, not integrated — [docs/audio.md](docs/audio.md) | Breadboard consolidation, non-blocking port |
-| Non-blocking playback scheduling | 🟠 Next task | Replacing the bench sketch's `delay(20000)` with `millis()` scheduling |
-| Prerecorded audio reminders | ⬜ Planned | Non-blocking playback |
+| Motion-triggered audio | 🟠 **Written, never run** — [docs/project-roadmap.md](docs/project-roadmap.md) | Running it on hardware |
+| Playback completion polling | ⬜ Planned | Wiring the DFPlayer BUSY pin, or confirming its TX line |
+| Interval-driven reminders | ⬜ Planned | Motion-triggered audio working first |
 | Configurable reminder intervals | ⬜ Planned | Reminder scheduler |
-| Mouth animation during playback | ⬜ Planned | Audio subsystem (BUSY signal) |
+| Mouth animation during playback | ⬜ Planned | Completion polling, so the mouth knows when to stop |
 | Expressions / moods | ⬜ Planned | Nothing — unblocked today |
-| PIR in the project firmware | 🟠 Verified standalone, not integrated — [docs/wiring.md](docs/wiring.md) | Non-blocking port; resolving the D1 pin collision |
-| Motion-triggered reminders | ⬜ Planned | PIR integration |
 | mmWave presence sensing | ⬜ Planned | Testing whether the PIR holds a trigger for someone sitting still |
 | Battery power | ⬜ Planned | Display backlight cannot be gated in firmware |
 | 3D printed enclosure | ⬜ Planned | Final part layout |
@@ -310,9 +335,11 @@ Desk-Buddy/
 ├── .gitignore
 ├── firmware/
 │   └── desk-buddy/               Arduino sketch (folder name must match .ino)
-│       ├── desk-buddy.ino        entry point: boot order + run loop
-│       ├── config.h              pin map, geometry, palette, timing
+│       ├── desk-buddy.ino        entry point: boot, run loop, behaviour
+│       ├── config.h              pins, geometry, palette, timing, volume
 │       ├── display.h / .cpp      hardware layer: ST7789 bring-up
+│       ├── motion.h / .cpp       hardware layer: PIR input, edge detection
+│       ├── audio.h / .cpp        hardware layer: DFPlayer UART frames
 │       └── face.h / .cpp         expression layer: face + blink animation
 └── docs/
     ├── architecture.md           system diagram, layers, scheduling model
@@ -330,10 +357,12 @@ Desk-Buddy/
 | If you want to… | Open |
 |---|---|
 | Change the face's proportions, colours, or blink rhythm | `firmware/desk-buddy/config.h` |
-| Change the pin map | `firmware/desk-buddy/config.h` |
+| Change the pin map, the volume, or the motion cooldown | `firmware/desk-buddy/config.h` |
 | See how the panel is brought up | `firmware/desk-buddy/display.cpp` |
 | See how the face is drawn and animated | `firmware/desk-buddy/face.cpp` |
-| See the boot order and the scheduler | `firmware/desk-buddy/desk-buddy.ino` |
+| See how motion is sampled and debounced | `firmware/desk-buddy/motion.cpp` |
+| See the DFPlayer command frames | `firmware/desk-buddy/audio.cpp` |
+| See the boot order, scheduler, and motion→audio policy | `firmware/desk-buddy/desk-buddy.ino` |
 | Understand *why* any of it is that way | `docs/` |
 
 The Arduino IDE requires a sketch's folder name to match its `.ino` file name,
@@ -360,6 +389,9 @@ compiled into the sketch automatically.
    ```
    Then *Boards Manager* → install **esp32** by Espressif Systems.
 2. **Select the board.** *Tools → Board → ESP32 Arduino → XIAO_ESP32C3*.
+   **Ensure *USB CDC On Boot* is enabled.** The DFPlayer uses D6/D7, which are
+   also UART0's default pins; with USB CDC disabled the serial console lands
+   on those same pins and contends with the audio module.
 3. **Install the libraries.** *Library Manager* →
    **Adafruit GFX Library** and **Adafruit ST7735 and ST7789 Library**
    (accept the Adafruit BusIO dependency prompt).
@@ -425,6 +457,9 @@ The choices worth defending, with their costs.
 | **Randomised blink interval** | A fixed interval reads as a metronome; this is the cheapest thing in the firmware that makes the robot feel alive | None |
 | **Integer-only interpolation** | The ESP32-C3 has no FPU, and single-pixel precision is sufficient | None |
 | **DFPlayer Mini for audio** | The ESP32-C3 has **no DAC**; DFPlayer offloads decoding off the single core and brings its own storage and amplifier | Audio is a black box — no mixing, synthesis, or generated speech |
+| **DFPlayer frames hand-assembled, no library** | Ten bytes with a checksum, two commands used; a dependency would cost more than it saves | The frame format and checksum are this project's to get right — verified against published reference frames rather than by trusting a library |
+| **Cooldown measured from command send, not playback end** | The DFPlayer's BUSY line is not wired and clip durations are unmeasured, so completion is not observable | A clip longer than the cooldown would be interrupted by the next trigger. Completion polling is the fix, and it needs a wire |
+| **Motion events dropped during cooldown, not queued** | A deferred trigger would fire the instant the cooldown ended, making the robot react to movement from twenty seconds earlier | Genuine motion at the end of a cooldown is ignored until the next movement |
 | **Audio files not committed** | Redistribution rights of the converted clips are not established, and git stores every binary revision forever | Anyone cloning must supply their own clips |
 | **Adafruit GFX over TFT_eSPI** | Better documented and more portable; the cost here is SPI transfer time, not drawing | Leaves performance on the table if the face ever needs sprites |
 

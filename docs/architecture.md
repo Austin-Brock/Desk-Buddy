@@ -74,11 +74,11 @@ Expanded, with current status on every edge:
 |---|---|---|
 | MCU → display | 4-wire SPI, hardware peripheral | **Implemented** |
 | Display → face | Adafruit GFX primitives | **Implemented** |
-| MCU → DFPlayer | UART, 9600 8N1 | **Verified on a standalone bench sketch** — no audio code in this firmware |
+| MCU → DFPlayer | UART, 9600 8N1 | Module **verified on a bench sketch**; the firmware's `audio.cpp` is **written but never run** |
 | DFPlayer → microSD | Internal to the module | **Verified** — card read, three tracks play |
 | DFPlayer → speaker | Differential analog | **Verified** — audio audible |
 | Display **and** audio together | — | **Not verified** — never run at the same time |
-| PIR → MCU | Digital input | **Verified on a standalone bench sketch** (D1) — no PIR code in this firmware |
+| PIR → MCU | Digital input | Sensor **verified on a bench sketch** (D1); the firmware's `motion.cpp` is **written but never run** |
 | MCU → network | Wi-Fi | **Planned** (V2) |
 
 ---
@@ -89,10 +89,18 @@ The firmware is structured in three layers, and each one is a file:
 
 | Layer | Files | Owns |
 |---|---|---|
-| Behaviour | `desk-buddy.ino` | Boot order, the cooperative run loop |
+| Behaviour | `desk-buddy.ino` | Boot order, the cooperative run loop, the motion-triggered audio policy |
 | Expression | `face.h` / `face.cpp` | Face geometry, drawing, blink state machine |
 | Hardware | `display.h` / `display.cpp` | Driver instance, ST7789 bring-up |
-| *(shared)* | `config.h` | Pin map, panel geometry, palette, proportions, timing |
+| Hardware | `motion.h` / `motion.cpp` | PIR pin, warm-up window, edge detection |
+| Hardware | `audio.h` / `audio.cpp` | DFPlayer UART, command frames, readiness timing |
+| *(shared)* | `config.h` | Pin map, panel geometry, palette, proportions, timing, volume |
+
+The hardware modules report facts and perform actions; they do not decide
+anything. `motion.cpp` reports that movement started, `audio.cpp` plays a
+numbered clip, and the decision connecting the two lives in the behaviour
+layer. That boundary is why the cooldown policy is in the sketch rather than
+in either module.
 
 `config.h` sits outside the layering on purpose: it is data, not behaviour,
 and it has no `#include` of its own so any layer can read it without pulling
@@ -141,19 +149,34 @@ drawing code.
      |-- displayBegin()                  display.cpp -- tft.init(240,320),
      |                                   rotation 0, clear to black
      |-- randomSeed(micros())
-     |-- faceBegin(millis())             face.cpp -- full-frame draw of the
+     |-- faceBegin(now)                  face.cpp -- full-frame draw of the
      |                                   resting face, then schedules the
      |                                   first blink 2.6-6.4 s out
+     |-- motionBegin(now)                motion.cpp -- pin as INPUT, starts
+     |                                   the 60 s sensor warm-up window
+     |-- audioBegin(now)                 audio.cpp -- opens UART1 on D7/D6,
+     |                                   starts the module's 2 s readiness
+     |                                   timer. Sends nothing yet
+     |-- lastAudioMs backdated           so the first motion event is not
+     |                                   swallowed by an unexpired cooldown
      v
   loop()                                  runs continuously, never blocks
      |
      |-- now = millis()
      |-- faceAnimationUpdate(now)        face.cpp -- at most one frame
-     |
-     |   (planned) audioUpdate(now)      poll DFPlayer, dispatch reminders
-     |   (planned) presenceUpdate(now)   sample PIR, update presence state
+     |-- motionUpdate(now)               motion.cpp -- sample the PIR every
+     |                                   20 ms, detect a rising edge
+     |-- audioUpdate(now)                audio.cpp -- deferred setup only
+     |-- behaviourUpdate(now)            this file -- consume a motion event,
+     |                                   apply the cooldown, play the next
+     |                                   clip in rotation
      |
      +-- return, repeat
+
+The animation is serviced first because it is the subsystem a human would
+notice stuttering. Nothing else in the loop can starve it: each call does at
+most one small unit of work, and the largest single action in the whole loop
+is one eye-band repaint.
 ```
 
 `faceDraw()` is the only routine that touches the whole frame, and it runs
@@ -210,6 +233,9 @@ what will start consuming it.
 | `lastFrameMs` | `face.cpp` | `static` | Frame pacing |
 | `nextBlinkMs` | `face.cpp` | `static` | When the next blink is due |
 | `tft` | `display.cpp` | `extern` via `display.h` | Driver instance |
+| `motionLastLevel`, `motionEventPending`, `motionWarmUpUntilMs`, `motionLastSampleMs`, `motionLastEdgeMs` | `motion.cpp` | `static` | Sensor level, latched event, timing |
+| `audioReadyAtMs`, `audioLastCommandMs`, `audioVolumeSent` | `audio.cpp` | `static` | Module readiness and command pacing |
+| `lastAudioMs`, `nextTrack` | `desk-buddy.ino` | `static` | Cooldown and clip rotation — behaviour policy |
 
 Every piece of animation state is file-local to the module that owns it, so no
 other translation unit can reach it. `tft` is the one deliberate exception:
@@ -227,8 +253,9 @@ Where the unimplemented subsystems are designed to attach:
 
 | Subsystem | Attaches as | Depends on |
 |---|---|---|
-| Audio reminders | `audio.h` / `audio.cpp` beside the existing modules, plus an `audioUpdate(now)` call in `loop()` | Porting the verified bench code to non-blocking form — see [audio.md](audio.md) |
-| Presence detection | `presence.h` / `presence.cpp`, plus a `presenceUpdate(now)` call in `loop()` feeding a flag to the behaviour layer | Porting the verified bench code; debounce logic; resolving the D1/D5 pin question |
+| Interval reminders | A scheduler in `behaviourUpdate()` alongside the motion policy | Nothing structural — the audio module already plays on request |
+| Playback completion polling | `audioIsBusy()` in `audio.cpp`, reading the BUSY pin or a status frame | Wiring the BUSY pin, or confirming the module's TX line is connected to D6 |
+| Mouth animation during playback | A call from `behaviourUpdate()` into the expression layer | Completion polling, so the mouth knows when to stop |
 | Expressions / moods | A mood enum in `face.cpp` selecting alternative geometry from `config.h` | Nothing — this one is unblocked today |
 | Multi-robot coordination | A network module, polled from `loop()` like everything else | Wi-Fi, a central service, a protocol — all V2 |
 

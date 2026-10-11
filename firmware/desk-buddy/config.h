@@ -169,4 +169,85 @@
  * robot must boot and run with no computer attached. */
 #define SERIAL_ATTACH_TIMEOUT_MS  1500UL
 
+/* ---------------------------------------------------------------------------
+ * Motion sensor -- HC-SR501 PIR
+ *
+ * OUT on D1 (GPIO3). Verified on hardware. D1 is not an ESP32-C3 strapping
+ * pin, which matters because the sensor drives its output high on motion
+ * including during power-up, and a strapping pin held high or low at reset
+ * selects the boot mode.
+ *
+ * The sensor is powered from the shared breadboard 5 V rail; its output swings
+ * to about 3.3 V, which an ESP32-C3 input takes directly with no level
+ * shifting. See docs/wiring.md.
+ * -------------------------------------------------------------------------*/
+#define PIR_PIN  D1   /* GPIO3 */
+
+/* The HC-SR501 needs roughly 30-60 s after power-up before its output is
+ * trustworthy; it commonly sits high for part of that. Motion events are
+ * discarded until this expires rather than letting the robot react to the
+ * sensor settling. */
+#define PIR_WARMUP_MS  60000UL
+
+/* How often the PIR pin is sampled. A PIR's output changes on a human
+ * timescale, so there is no reason to read it every pass through loop() --
+ * 20 ms is far faster than the sensor can meaningfully change and leaves the
+ * loop free for the animation. */
+#define PIR_SAMPLE_INTERVAL_MS  20UL
+
+/* Minimum time between accepted edges. The bench sketch read the pin raw with
+ * no debouncing; this rejects contact noise and brief glitches without
+ * needing a filter. */
+#define PIR_EDGE_GUARD_MS  150UL
+
+/* ---------------------------------------------------------------------------
+ * Audio -- DFPlayer HW-247A over UART
+ *
+ * As-built wiring: MCU transmit on D7 (GPIO20) to the module's RX. The
+ * module's TX to D6 (GPIO21) is configured as the MCU's receive pin, but may
+ * not be physically connected -- one-way control works either way, and
+ * nothing in this firmware reads from the module yet.
+ *
+ * CAUTION: D6/D7 (GPIO21/GPIO20) are the ESP32-C3's default UART0 pins, which
+ * is also where the Arduino serial console lands if "USB CDC On Boot" is
+ * DISABLED. This firmware drives the DFPlayer from UART1 with these pins
+ * assigned explicitly through the GPIO matrix, which is only conflict-free
+ * while the console is on the native USB port. Build with USB CDC on boot
+ * enabled. See docs/wiring.md.
+ * -------------------------------------------------------------------------*/
+#define DFPLAYER_TX_PIN  D7   /* GPIO20 -- MCU transmit -> module RX */
+#define DFPLAYER_RX_PIN  D6   /* GPIO21 -- MCU receive  <- module TX */
+#define DFPLAYER_BAUD    9600 /* the module's fixed control baud rate */
+
+/* The module ignores commands for a period after power-up. Commands are held
+ * back until this elapses rather than being sent and silently lost. The value
+ * is a conservative guess, not a measurement -- the module's documented
+ * initialisation time varies between clone variants. */
+#define DFPLAYER_BOOT_MS  2000UL
+
+/* Minimum gap between command frames. One frame is 10 bytes, which takes
+ * about 10 ms to clock out at 9600 baud; this leaves the module room to act
+ * on a command before the next arrives. */
+#define DFPLAYER_COMMAND_GAP_MS  100UL
+
+/* Playback volume, 0-30. Deliberately well below maximum: the amplifier can
+ * draw more current than a 500 mA USB port has spare, and the robot shares
+ * that supply with the display. See docs/hardware.md. */
+#define AUDIO_VOLUME  18
+
+/* Number of clips on the card, as /mp3/0001.mp3 .. /mp3/000N.mp3. */
+#define AUDIO_TRACK_COUNT  3
+
+/* ---------------------------------------------------------------------------
+ * Behaviour -- motion-triggered audio
+ *
+ * A new motion event plays the next clip in rotation. The cooldown exists
+ * because a person working at a desk generates near-continuous motion; without
+ * it the robot would talk over itself constantly. It is measured from the
+ * moment the command is sent, not from playback completion, because the
+ * DFPlayer's BUSY line is not wired and clip durations have not been
+ * measured. See docs/audio.md.
+ * -------------------------------------------------------------------------*/
+#define MOTION_COOLDOWN_MS  20000UL
+
 #endif /* DESK_BUDDY_CONFIG_H */

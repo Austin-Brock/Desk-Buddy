@@ -63,8 +63,10 @@ Verified on hardware:
 
 Remaining:
 
-- [ ] Integrate audio into the main firmware
-- [ ] Replace blocking delays with `millis()`-based scheduling
+- [x] Integrate audio into the main firmware (`audio.h` / `audio.cpp`) —
+      written, **not yet run**
+- [x] Replace blocking delays with `millis()`-based scheduling — written,
+      **not yet run**
 - [ ] Confirm whether the 1 kΩ RX resistor and VCC bulk capacitor are fitted
 - [ ] Verify display animations during audio playback
 - [ ] Integrate the motion sensor
@@ -117,7 +119,8 @@ Remaining:
 - [x] Resolve the D1 pin conflict — DFPlayer moved to D6/D7, PIR keeps D1
 - [ ] Confirm the retrigger jumper configuration (H or L)
 - [ ] Measure the output HIGH duration, and record the trim pot positions
-- [ ] Integrate the PIR into the project firmware, non-blocking
+- [x] Integrate the PIR into the project firmware (`motion.h` /
+      `motion.cpp`), non-blocking — written, **not yet run**
 - [ ] Verify the blink animation still runs during motion detection
 - [ ] Test false-trigger behaviour
 - [ ] Test whether a person sitting still keeps the sensor triggered
@@ -136,6 +139,9 @@ more firmware.
 - [ ] Evaluate an mmWave presence sensor (e.g. LD2410) as a replacement
 
 ### Motion-triggered audio — **firmware written, never run**
+
+> The checked items in this section mean *code exists and was statically
+> checked*, not *works*. Nothing here has been on hardware.
 
 A combined behaviour: a new motion event plays the next of the three clips in
 rotation, with a 20-second cooldown so a single person moving at a desk does

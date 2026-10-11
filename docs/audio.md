@@ -254,22 +254,34 @@ the line and check the bytes.
 
 ---
 
-## 6. Proposed firmware interface
+## 6. Firmware interface — **implemented, unverified**
 
-A sketch of the intended module boundary. **This code does not exist yet.**
+`firmware/desk-buddy/audio.h`. The code exists and has been statically
+checked; **it has never been run on hardware.**
 
 ```c
-/* audio.h -- PROPOSED, NOT IMPLEMENTED */
+void audioBegin(unsigned long now);   /* setup(); opens UART1, non-blocking */
+void audioUpdate(unsigned long now);  /* loop(); deferred setup only        */
 
-bool audioBegin();                  /* called from setup(); may block */
-void audioUpdate(unsigned long now);/* called from loop(); must not block */
-
-void audioPlayTrack(uint16_t track);/* /mp3/NNNN.mp3 via command 0x12 */
-void audioSetVolume(uint8_t vol);   /* 0-30 */
-bool audioIsBusy();                 /* true while a clip is playing */
+bool audioPlayTrack(unsigned long now, uint16_t track);  /* command 0x12 */
+bool audioSetVolume(unsigned long now, uint8_t volume);  /* command 0x06 */
+bool audioIsReady(unsigned long now);
 ```
 
-Design constraints this interface has to satisfy:
+Two differences from the interface originally proposed here, both forced by
+what the hardware turned out to allow:
+
+- **`audioBegin()` does not block.** The original design assumed a library
+  handshake that waits for an acknowledgement frame. Without the module's TX
+  line confirmed connected, no acknowledgement is available — so instead of
+  waiting, `audioBegin()` records when the module's power-up window expires
+  and `audioUpdate()` sends the volume command once it has.
+- **There is no `audioIsBusy()`.** Playback completion is not observable on
+  this build: BUSY is unwired and no status frame is read. `audioIsReady()`
+  reports elapsed time, not module state, and says so. This is the gap that
+  the reminder scheduler needs closed.
+
+Design constraints the implementation satisfies:
 
 - **`audioUpdate()` must never block.** It follows the same contract as
   `faceAnimationUpdate()`: at most one small unit of work per call. See
@@ -285,10 +297,14 @@ Design constraints this interface has to satisfy:
 - **Playback completion is polled, not awaited.** Either the BUSY pin or a
   status query; never a blocking wait for a clip to finish. A 10-second clip
   must not freeze the face for 10 seconds.
-- **Volume gets a conservative default.** The amplifier can pull more current
-  than a 500 mA USB port has spare. The default will be set well below
-  maximum, with the headroom problem documented in
-  [hardware.md](hardware.md) rather than discovered as a brownout.
+- **Volume gets a conservative default.** `AUDIO_VOLUME` is 18 of 30. The
+  amplifier can pull more current than a 500 mA USB port has spare, and the
+  robot shares that supply with the display — see [hardware.md](hardware.md).
+
+The frame builder's checksum arithmetic was verified against published
+reference frames for commands `0x06` and `0x12` before the code was
+committed, which is the one part of this module that can be checked without
+hardware.
 
 ---
 
@@ -305,7 +321,7 @@ its test passes on hardware.
 | ✅ | 5 | UART driver and handshake | Module accepts commands at 9600 baud |
 | ✅ | 6 | Play a track at a set volume | Three clips played sequentially |
 | ✅ | 2 | Move the build to the breadboard; shared 5 V rail and common ground | PIR and DFPlayer both on the rails; audio played. **Display not yet reconnected to the shared build** |
-| ⬜ | 7 | Port the audio code into the firmware as `audioUpdate()` with non-blocking completion polling | A clip plays through while the eyes keep blinking on schedule, with no visible hitch in the animation |
+| 🟠 | 7 | Port the audio code into the firmware as `audioUpdate()` | **Code written, never run.** Acceptance test unchanged: a clip plays through while the eyes keep blinking on schedule, with no visible hitch |
 | ⬜ | 8 | Reminder scheduler: configurable interval, selects a clip | A reminder fires on its interval while the face animates normally |
 | ⬜ | 9 | Measure current draw at idle and at playback peak | Figures recorded in [hardware.md](hardware.md), replacing the datasheet estimates |
 

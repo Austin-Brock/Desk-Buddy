@@ -19,7 +19,7 @@
 
 ---
 
-## 1. Hardware verification — October 2026
+## 1. Hardware verification (October 2026)
 
 **Status: standalone audio playback verified.**
 

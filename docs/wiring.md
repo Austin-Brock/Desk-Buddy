@@ -116,30 +116,92 @@ See [audio.md](audio.md) for the protocol and the microSD layout.
 
 ---
 
-## 3. Presence detection — HC-SR501 PIR → XIAO ESP32C3 · **Planned**
+## 3. Presence detection — HC-SR501 PIR → XIAO ESP32C3 · **Verified independently**
 
-Not wired. Not implemented in firmware.
+Motion detection is verified on hardware with a standalone bench sketch. The
+PIR is **not** in the project firmware, and it has never been run alongside
+the display or the DFPlayer.
+
+### Bench-test wiring — as built
 
 | HC-SR501 pin | XIAO pin | GPIO | Notes |
 |---|---|---|---|
 | VCC | 5V | — | Module needs 4.5 V or more |
 | GND | GND | — | Common ground |
-| OUT | D5 | 7 | ~3.3 V when triggered; safe for an ESP32-C3 input |
+| OUT | **D1** | **3** | ~3.3 V when triggered; safe for an ESP32-C3 input |
 
 ```
    XIAO ESP32C3                       HC-SR501 PIR
   +--------------+                   +--------------+
   |           5V |-------------------| VCC          |
   |          GND |-------------------| GND          |
-  |   D5  (GPIO7)|-------------------| OUT          |
+  |   D1  (GPIO3)|-------------------| OUT          |
   +--------------+                   +--------------+
                                       sensitivity + hold-time
                                       trim pots, retrigger jumper
+            as-built bench test -- not the production pin
 ```
 
-D5 is chosen because it is not a strapping pin. The sensor drives its output
-high on motion, including during power-up; a strapping pin must not be exposed
-to that.
+The bench sketch configured D1 as a digital input and printed to the Serial
+Monitor at 115200 baud whenever the sensor's output changed state. Observed
+output, repeating as motion started and stopped:
+
+```
+MOTION DETECTED!
+No motion.
+MOTION DETECTED!
+No motion.
+```
+
+That confirms the sensor drives clean HIGH/LOW transitions into an ESP32-C3
+GPIO input. It confirms nothing about timing, sensitivity, or reliability.
+
+### ⚠️ D1 collides with the proposed DFPlayer wiring
+
+**D1 (GPIO3) is the pin this document proposes for DFPlayer TX → MCU RX**
+(section 2 above).
+The bench test was run in isolation, so nothing conflicted at the time, but
+the PIR and the audio module cannot both have D1 in the assembled robot.
+
+This is an argument for keeping the production PIR input on D5 rather than
+adopting the bench pin, and it is also a reason the as-built DFPlayer pins
+need recording: if the verified audio build actually used D1 for something,
+the collision is already real rather than hypothetical.
+
+### Production pin allocation
+
+**D5 (GPIO7) remains the proposed production PIR input. The D5 configuration
+has not been verified.**
+
+D5 is preferred over the bench pin for two reasons: it avoids the DFPlayer
+collision above, and neither pin is a strapping pin — the sensor drives its
+output high on motion, including during power-up, and a strapping pin must
+never be exposed to that. GPIO3 happens to be safe on that count too, so the
+collision is the deciding factor, not boot safety.
+
+### Unknown hardware settings
+
+None of the following was recorded during the test, and all of them affect how
+the sensor behaves in firmware:
+
+- Retrigger mode jumper (H = repeat trigger, L = single trigger): **unknown**
+- Sensitivity trim pot: **unknown**
+- Time-delay (hold) trim pot: **unknown**
+- Measured duration the output stays HIGH after a trigger: **unmeasured**
+- False-trigger behaviour: **not established**
+- Whether the sensor keeps triggering for a person sitting still: **not
+  tested** — this is the limitation that matters most for this robot, see
+  [hardware.md](hardware.md)
+
+### Integration status
+
+- Not in the project firmware; standalone bench sketch only.
+- Never run alongside the display or the DFPlayer.
+- The bench sketch read the pin with a raw `digitalRead()` and no debouncing,
+  and paced its loop with `delay(100)` — acceptable on the bench, not
+  acceptable in the firmware's non-blocking run loop.
+- Breadboard consolidation is not done, so there is still no shared 5 V rail
+  or single common ground point for three modules.
 
 ---
 
@@ -148,19 +210,23 @@ to that.
 | XIAO | GPIO | Assigned to | Status |
 |---|---|---|---|
 | D0 | 2 | Display CS | **Verified** |
-| D1 | 3 | DFPlayer TX → MCU RX | **Proposed** — as-built pin not yet confirmed |
+| D1 | 3 | DFPlayer TX → MCU RX *(proposed)* / PIR OUT *(bench test, as built)* | ⚠️ **Collision** — see section 3 |
 | D2 | 4 | Display DC | **Verified** |
 | D3 | 5 | MCU TX → DFPlayer RX | **Proposed** — as-built pin not yet confirmed |
 | D4 | 6 | *free* | — |
-| D5 | 7 | PIR OUT | **Planned** |
+| D5 | 7 | PIR OUT | **Proposed production pin** — unverified |
 | D6 | 21 | *free* (default UART0 TX) | — |
 | D7 | 20 | *free* (default UART0 RX) | — |
 | D8 | 8 | Display SCL (SPI SCK) | **Verified** |
 | D9 | 9 | *reserved* — BOOT button, strapping pin | avoid |
 | D10 | 10 | Display SDA (SPI MOSI) | **Verified** |
 
-With the display, audio, and PIR all connected, three pins (D4, D6, D7) remain
-free for expansion.
+With the display, audio, and PIR all connected on their intended pins, three
+pins (D4, D6, D7) remain free for expansion.
+
+The D1 row is the one unresolved assignment: it is the proposed DFPlayer
+receive pin *and* the pin the PIR bench test actually used. Resolving it means
+recording the as-built DFPlayer wiring and moving the PIR to D5.
 
 ---
 

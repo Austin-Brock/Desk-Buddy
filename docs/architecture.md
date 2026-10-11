@@ -60,12 +60,13 @@ Expanded, with current status on every edge:
                                      |   AUDIO VERIFIED        |
                                      +-------------------------+
 
-   - - - - - - - - - - -  planned, nothing built  - - - - - - - - - - -
+   - - - - -  not in the firmware; bench-verified or unbuilt  - - - - -
 
           +-------------------------+   +-------------------------+
           |   HC-SR501 PIR          |   |  Wi-Fi / central        |
-          |   presence detection    |   |  service (V2)           |
-          |   PLANNED               |   |  PLANNED                |
+          |   motion detection      |   |  service (V2)           |
+          |   BENCH-VERIFIED        |   |  PLANNED                |
+          |   on D1, not D5         |   |                         |
           +-------------------------+   +-------------------------+
 ```
 
@@ -77,7 +78,7 @@ Expanded, with current status on every edge:
 | DFPlayer → microSD | Internal to the module | **Verified** — card read, three tracks play |
 | DFPlayer → speaker | Differential analog | **Verified** — audio audible |
 | Display **and** audio together | — | **Not verified** — never run at the same time |
-| PIR → MCU | Digital input | **Planned** |
+| PIR → MCU | Digital input | **Verified on a standalone bench sketch** (D1) — no PIR code in this firmware |
 | MCU → network | Wi-Fi | **Planned** (V2) |
 
 ---
@@ -227,7 +228,7 @@ Where the unimplemented subsystems are designed to attach:
 | Subsystem | Attaches as | Depends on |
 |---|---|---|
 | Audio reminders | `audio.h` / `audio.cpp` beside the existing modules, plus an `audioUpdate(now)` call in `loop()` | Porting the verified bench code to non-blocking form — see [audio.md](audio.md) |
-| Presence detection | `presence.h` / `presence.cpp`, plus a `presenceUpdate(now)` call in `loop()` feeding a flag to the behaviour layer | PIR wiring, debounce logic |
+| Presence detection | `presence.h` / `presence.cpp`, plus a `presenceUpdate(now)` call in `loop()` feeding a flag to the behaviour layer | Porting the verified bench code; debounce logic; resolving the D1/D5 pin question |
 | Expressions / moods | A mood enum in `face.cpp` selecting alternative geometry from `config.h` | Nothing — this one is unblocked today |
 | Multi-robot coordination | A network module, polled from `loop()` like everything else | Wi-Fi, a central service, a protocol — all V2 |
 

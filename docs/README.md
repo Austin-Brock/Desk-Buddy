@@ -6,7 +6,7 @@ Engineering documentation for [Desk-Buddy](../README.md).
 |---|---|---|
 | [architecture.md](architecture.md) | System diagram, firmware layers, control flow, scheduling model, state ownership, extension points | Mixed — marked per item |
 | [hardware.md](hardware.md) | Bill of materials, XIAO ESP32C3 GPIO constraints, panel and module properties, power budget, assembly notes | Mixed — marked per part |
-| [wiring.md](wiring.md) | Connection tables and diagrams per subsystem, whole-board pin allocation, bring-up checklist | Display **verified**; audio wired and playing but the as-built pin assignment is **not yet recorded**; PIR **planned** |
+| [wiring.md](wiring.md) | Connection tables and diagrams per subsystem, whole-board pin allocation, bring-up checklist | Display **verified**; audio and PIR each **bench-verified** but their as-built pins are **unrecorded or in conflict** |
 | [display.md](display.md) | Panel configuration, face geometry, animation architecture, blink state machine, timing | **Implemented and verified** |
 | [audio.md](audio.md) | Hardware verification record, DFPlayer selection rationale, microSD layout, UART protocol, proposed interface, integration plan, risks | Standalone playback **verified**; **not integrated** into the firmware |
 | [project-roadmap.md](project-roadmap.md) | V1 / V1.1 / V2 phases, exit criteria, backlog, non-goals, dependency graph | Plan |

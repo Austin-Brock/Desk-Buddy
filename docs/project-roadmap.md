@@ -13,7 +13,7 @@ dependency instead: each phase unblocks the next.
 | | |
 |---|---|
 | **Working** | ST7789 display bring-up, minimalist face, non-blocking randomised blink animation |
-| **Working, separately** | DFPlayer audio: three MP3 files played sequentially from microSD through the speaker — verified on a standalone bench sketch, **not** in the project firmware |
+| **Working, separately** | DFPlayer audio: three MP3 files played sequentially from microSD through the speaker. HC-SR501 PIR: clean motion HIGH/LOW transitions reported over serial. Both verified on standalone bench sketches, **neither** in the project firmware |
 | **In progress** | Running display and audio together, and porting the audio code into the firmware with non-blocking scheduling |
 | **Planned next** | Reminder scheduling, then presence detection |
 | **Power** | USB-C only |
@@ -96,22 +96,51 @@ running long enough to find out.
 
 ---
 
-## V1.1 — Presence detection
+## V1.1 — Motion and presence detection — **in progress**
 
-Depends on: V1 complete.
+Depended on: V1 complete. The sensor was bench-tested ahead of that.
 
-- [ ] Wire the HC-SR501 PIR on D5 (GPIO7) — see [wiring.md](wiring.md)
+Verified on hardware:
+
+- [x] Acquire the HC-SR501 PIR sensor
+- [x] Connect the PIR to the XIAO ESP32C3 (5 V, OUT on D1/GPIO3)
+- [x] Verify HIGH/LOW transitions using the Serial Monitor
+
+Remaining:
+
+- [ ] Confirm the retrigger jumper configuration (H or L)
+- [ ] Measure the output HIGH duration, and record the trim pot positions
+- [ ] Resolve the D1 collision with the proposed DFPlayer receive pin
+- [ ] Verify the production pin D5 (GPIO7)
+- [ ] Integrate the PIR into the project firmware, non-blocking
+- [ ] Verify the blink animation still runs during motion detection
+- [ ] Test false-trigger behaviour
+- [ ] Test whether a person sitting still keeps the sensor triggered
 - [ ] Debounced presence state in the behaviour layer
+- [ ] Implement motion-aware reminder scheduling
 - [ ] Suppress reminders when nobody is at the desk
 - [ ] An "awake vs idle" face distinction driven by presence
 
-The known limitation, recorded now so it is not a surprise later: the
-HC-SR501 detects *motion*, not *presence*. Somebody sitting still and working
-— precisely the person this robot exists for — stops triggering it. If
-debouncing and hold-time tuning cannot paper over that, the answer is a
-different sensor, not more firmware.
+The known limitation, recorded before the sensor was bought and still
+unresolved: the HC-SR501 detects *motion*, not *presence*. Somebody sitting
+still and working — precisely the person this robot exists for — stops
+triggering it. The bench test did not examine this. If debouncing and
+hold-time tuning cannot paper over it, the answer is a different sensor, not
+more firmware.
 
 - [ ] Evaluate an mmWave presence sensor (e.g. LD2410) as a replacement
+
+### Sequencing note
+
+The original plan put presence detection after V1's audio work. With the PIR
+now proven on the bench, there is a case for integrating it into the firmware
+*first*: it needs one GPIO input and no new protocol, where audio needs a UART
+driver and non-blocking completion polling. Integrating the simpler subsystem
+first would also validate the "second subsystem alongside the animation"
+question more cheaply.
+
+**This reordering has not been decided.** Both are recorded here; V1's exit
+criteria still reference audio reminders.
 
 ---
 
@@ -212,6 +241,8 @@ Worth stating, because "could this do X" has a cost:
                           |
                           v
           display + audio together  <-- YOU ARE HERE
+            (or display + PIR first;
+             see the sequencing note)
                           |
                           v
      non-blocking audio in firmware ----> reminder scheduling ----> V1 COMPLETE

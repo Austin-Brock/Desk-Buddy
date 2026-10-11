@@ -22,7 +22,7 @@ the firmware.
 | 3 | DFPlayer module (HW-247A) | 1 | UART, 9600 8N1 | **Playback verified** |
 | 4 | 3 W 8 Ω speaker | 1 | Analog, differential | **Playback verified** |
 | 5 | 16 GB microSD card (FAT) | 1 | Hosted by DFPlayer | **Playback verified** |
-| 6 | HC-SR501 PIR motion sensor | 1 | Digital, 3.3 V out | **Planned** |
+| 6 | HC-SR501 PIR motion sensor | 1 | Digital, 3.3 V out | **Verified independently** |
 | 7 | Breadboard | 1 | — | Ordered, not yet incorporated |
 | 8 | Dupont jumper wires | — | — | In use |
 
@@ -175,24 +175,57 @@ Hazards to design around:
 
 ---
 
-## 5. Presence detection: HC-SR501 PIR — **planned**
+## 5. Presence detection: HC-SR501 PIR — **verified independently**
+
+Motion detection works: wired to the XIAO at 5 V with its output on D1
+(GPIO3), the sensor drove clean HIGH/LOW transitions that a standalone bench
+sketch reported over the Serial Monitor. Not in the project firmware, never
+run alongside the display or the DFPlayer. Wiring and the full list of what
+the test did *not* establish are in [wiring.md](wiring.md).
 
 | Property | Value |
 |---|---|
 | Supply | 4.5–20 V (5 V here) |
 | Output | Digital, ~3.3 V when triggered |
 | Adjustments | Sensitivity and hold-time trim pots, retrigger jumper |
+| Bench-test pin | D1 (GPIO3) — **verified** |
+| Production pin | D5 (GPIO7) — **proposed, unverified** |
 
 The 3.3 V output level is directly compatible with an ESP32-C3 input, so the
-sensor needs no interface circuitry. The planned pin is D5 (GPIO7), chosen
-because it is not a strapping pin and because an unpredictable sensor output
-must never be able to influence the boot mode.
+sensor needs no interface circuitry. D5 (GPIO7) remains the intended
+production pin, because D1 is also the proposed DFPlayer receive pin and the
+two cannot share it; neither pin is a strapping pin, so boot safety does not
+decide between them.
 
-The known weakness of this part is that it reports *motion*, not *presence*. A
-person sitting still at a desk stops triggering it, which is the exact
-situation the robot cares about. This is why mmWave presence sensing is listed
-as an alternative in the [roadmap](project-roadmap.md) rather than the PIR
-being treated as a finished answer.
+### Five behaviours to design around
+
+The sensor is easy to wire and easy to misread. Each of these is unresolved on
+this unit:
+
+1. **It reports motion, not presence.** A person sitting still at a desk stops
+   triggering it — the exact situation this robot cares about. A LOW output is
+   not proof that nobody is there, and firmware must never treat it that way.
+   This is why mmWave presence sensing is listed as an alternative in the
+   [roadmap](project-roadmap.md) rather than the PIR being treated as a
+   finished answer. **Not yet tested on this unit.**
+2. **The HIGH duration is adjustable, and long.** After a trigger the output
+   stays HIGH for a period set by the time-delay pot, which on this part can
+   range from a few seconds to several minutes. A detection is therefore not
+   an instantaneous event, and the output going LOW tells you the hold period
+   expired, not that motion stopped. **The pot setting and the actual duration
+   are unmeasured.**
+3. **Retrigger mode changes the semantics.** With the jumper in **H** (repeat
+   trigger) further movement extends the HIGH period; in **L** (single
+   trigger) the output completes a fixed cycle and then ignores input briefly
+   before it can fire again. Reminder logic has to know which it is dealing
+   with. **The jumper position on this unit is unrecorded.**
+4. **It needs a warm-up.** Allow roughly 30–60 s after power-up before
+   treating detections as reliable. The firmware should not act on presence
+   immediately at boot.
+5. **False triggers are common in practice** — warm air currents, direct
+   sunlight, nearby switching supplies. **Not characterised on this unit**,
+   and the bench sketch used a raw `digitalRead()` with no debouncing, so the
+   test would not have distinguished a false trigger from a real one.
 
 ---
 

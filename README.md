@@ -46,7 +46,10 @@ was built, what was chosen over what, and what remains unbuilt.
 | Sequential MP3 playback | ✅ **Three files verified** | `/mp3/0001-0003.mp3` played by track number |
 | Display + audio integration | 🟠 **In progress** | Each subsystem works alone; **never run together**, and no audio code in the firmware |
 | Reminder scheduling | ⬜ **Planned** | Needs non-blocking playback scheduling first |
-| Motion detection (HC-SR501) | ⬜ **Planned** | Sensor not wired, no firmware |
+| Motion detection | ✅ **Verified independently** | HC-SR501 successfully tested with XIAO D1; main firmware integration pending |
+| PIR integration into firmware | ⬜ **Not implemented** | Production pin D5 unverified; D1 collides with the proposed DFPlayer pin |
+| Motion-triggered reminders | ⬜ **Not implemented** | Needs PIR integration |
+| Breadboard consolidation | ⬜ **Not completed** | Prerequisite for running any two subsystems together |
 | Battery power | ⬜ **Planned** | Blocked on the display's backlight — see [hardware.md](docs/hardware.md) |
 | 3D printed enclosure | ⬜ **Planned** | — |
 | Multi-robot coordination | ⬜ **Planned** | V2 |
@@ -55,11 +58,12 @@ was built, what was chosen over what, and what remains unbuilt.
 > verified on hardware. 🟠 means partially proven or in progress. ⬜ means
 > intent only — no wiring, no code.
 >
-> Note the gap between "verified independently" and "integrated": the display
-> and the audio subsystem have each been proven on their own and have **never
-> been run at the same time.** The audio verification used a separate bench
-> sketch with blocking `delay()` calls; no audio code exists in the project
-> firmware yet.
+> Note the gap between "verified independently" and "integrated". Three
+> subsystems now work — display, audio, and motion detection — but **only the
+> display runs in the project firmware.** Audio and the PIR were each proven
+> on separate bench sketches, using blocking `delay()` calls that the
+> firmware's scheduling model does not permit, and **no two subsystems have
+> ever been run at the same time.**
 
 ---
 
@@ -120,7 +124,7 @@ toolchain lives on the author's machine. See [§12](#12-setup-and-build).
 | DFPlayer module (HW-247A) | 1 | UART 9600 8N1 | ✅ Wired, playback verified |
 | 3 W 8 Ω speaker | 1 | Differential analog | ✅ Connected, audio verified |
 | 16 GB microSD card (FAT) | 1 | Hosted by DFPlayer | ✅ Read by the DFPlayer, three tracks play |
-| HC-SR501 PIR sensor | 1 | Digital, 3.3 V out | ⬜ Planned |
+| HC-SR501 PIR sensor | 1 | Digital, 3.3 V out | ✅ Motion detection verified |
 | Breadboard | 1 | — | Ordered, not yet incorporated |
 | Dupont jumper wires | — | — | ✅ In use |
 
@@ -261,8 +265,9 @@ Nothing in this section is wired or written.
 | Configurable reminder intervals | ⬜ Planned | Reminder scheduler |
 | Mouth animation during playback | ⬜ Planned | Audio subsystem (BUSY signal) |
 | Expressions / moods | ⬜ Planned | Nothing — unblocked today |
-| PIR presence detection | ⬜ Planned | V1 completion |
-| mmWave presence sensing | ⬜ Planned | Evaluation of the PIR's limits |
+| PIR in the project firmware | 🟠 Verified standalone, not integrated — [docs/wiring.md](docs/wiring.md) | Non-blocking port; resolving the D1 pin collision |
+| Motion-triggered reminders | ⬜ Planned | PIR integration |
+| mmWave presence sensing | ⬜ Planned | Testing whether the PIR holds a trigger for someone sitting still |
 | Battery power | ⬜ Planned | Display backlight cannot be gated in firmware |
 | 3D printed enclosure | ⬜ Planned | Final part layout |
 | Multi-robot coordination | ⬜ Planned | V1.1, a central service, a protocol |
@@ -275,7 +280,7 @@ Nothing in this section is wired or written.
 | Phase | Contents | State |
 |---|---|---|
 | **V1** | Animated face, audio reminders, configurable intervals, USB powered | Display done; audio verified standalone; integration next |
-| **V1.1** | PIR presence detection, reminder suppression when away, awake/idle faces | Planned |
+| **V1.1** | PIR presence detection, reminder suppression when away, awake/idle faces | Motion detection verified standalone; integration pending |
 | **V2** | Moods and transitions, battery, enclosure, multi-robot + central service, OTA | Planned |
 
 V1 is complete when the robot boots standalone from USB, plays a reminder on a

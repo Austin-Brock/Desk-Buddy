@@ -42,7 +42,7 @@
 - Module powered from the **shared breadboard 5 V rail**, with the HC-SR501
   PIR connected to the same rails. Audio played with both modules on the
   supply.
-- UART on **D7** (GPIO20) carrying MCU transmit → DFPlayer RX. See
+- UART on **D6** (GPIO21) carrying MCU transmit → DFPlayer RX. See
   [wiring.md](wiring.md).
 
 ### What the 20 seconds actually means
@@ -359,9 +359,9 @@ scheduling.
   original design and neither is recorded. They are noise and transient
   mitigations rather than functional requirements — consistent with playback
   working — but they matter once the amplifier shares a board with the
-  display's SPI lines. *(The pin assignment question is now answered: RX on
-  D7, verified.)*
-- **Is the DFPlayer's TX line connected to D6 at all?** One-way control works
+  display's SPI lines. *(The pin assignment question is now answered: the
+  module's RX is on D6, settled by the working combined sketch.)*
+- **Is the DFPlayer's TX line connected to D7 at all?** One-way control works
   without it, but status queries and completion polling need it.
 - **What volume value was used**, and what is the actual current draw at that
   volume?

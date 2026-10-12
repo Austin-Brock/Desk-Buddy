@@ -111,8 +111,8 @@ three MP3 files played from the microSD card through the speaker. See
 |---|---|---|---|---|
 | VCC | 5 V rail | — | **Verified** | Shared breadboard rail; **not** the 3V3 rail |
 | GND | GND rail | — | **Verified** | Shared breadboard rail |
-| RX | **D7** | 20 | **Verified** | MCU transmit → module receive |
-| TX | **D6** | 21 | *Unconfirmed* | Module transmit → MCU receive. Not listed in the as-built notes; one-way control works without it |
+| RX | **D6** | 21 | **Verified** | MCU transmit → module receive. D6 is the XIAO's labelled TX pin |
+| TX | **D7** | 20 | *Unconfirmed* | Module transmit → MCU receive. One-way control works without it, and nothing reads from the module yet |
 | SPK_1 | — | — | **Verified** | Speaker **red** (differential — do not ground) |
 | SPK_2 | — | — | **Verified** | Speaker **black** (differential — do not ground) |
 | BUSY | *not connected* | — | — | Low while playing; not used yet |
@@ -122,8 +122,9 @@ three MP3 files played from the microSD card through the speaker. See
   +--------------+                      +---------------+
   |           5V |---> red (+) rail --->| VCC           |
   |          GND |---> blue (-) rail -->| GND           |
-  |  D7 (GPIO20) |----------------------| RX            |
-  |  D6 (GPIO21) |- - - - - - - - - - - | TX  (unconfirmed)
+  |  D6 (GPIO21) |----------------------| RX            |
+  |   (XIAO "TX")|                      |               |
+  |  D7 (GPIO20) |- - - - - - - - - - - | TX  (unconfirmed)
   +--------------+                      |               |
                                         | SPK_1  SPK_2  |
                                         +---+-------+---+
@@ -136,6 +137,13 @@ three MP3 files played from the microSD card through the speaker. See
 
 ### Three notes on this as-built wiring
 
+- **The direction here is settled by a working build, not by inference.**
+  `firmware/combined-reference` — the sketch that demonstrably plays audio —
+  configures UART1 as `begin(9600, SERIAL_8N1, rxPin=D7, txPin=D6)`, so the
+  MCU transmits on **D6** and the module's RX input is on D6. This is also the
+  natural assignment: the XIAO silkscreen labels D6 as TX and D7 as RX. An
+  earlier revision of this document recorded the module's RX on D7, which was
+  the wrong way round.
 - **⚠️ D6/D7 are the ESP32-C3's default UART0 pins** (GPIO21 = TX,
   GPIO20 = RX), which is also where the Arduino serial console lands **if
   "USB CDC On Boot" is disabled.** With USB CDC enabled, `Serial` goes over
@@ -249,8 +257,8 @@ the sensor behaves in firmware:
 | D3 | 5 | *free* | — |
 | D4 | 6 | *free* | — |
 | D5 | 7 | *free* | — |
-| D6 | 21 | MCU RX ← DFPlayer TX (default UART0 TX pin) | *Unconfirmed* — may not be wired |
-| D7 | 20 | MCU TX → DFPlayer RX (default UART0 RX pin) | **Verified** |
+| D6 | 21 | MCU TX → DFPlayer RX (UART0's native TX pin) | **Verified** |
+| D7 | 20 | MCU RX ← DFPlayer TX (UART0's native RX pin) | *Unconfirmed* — may not be wired |
 | D8 | 8 | Display SCL (SPI SCK) | **Verified** |
 | D9 | 9 | *reserved* — BOOT button, strapping pin | avoid |
 | D10 | 10 | Display SDA (SPI MOSI) | **Verified** |
@@ -303,7 +311,7 @@ that cost a DFPlayer Mini when skipped** — see
 4. Connect SCL → D8, SDA → D10, DC → D2, CS → D0. Leave RST unconnected.
 5. Add the remaining modules **one at a time**, checking the display still
    runs after each: PIR (VCC/GND to the rails, OUT → D1), then the DFPlayer
-   (VCC/GND to the rails, RX → D7, speaker across SPK_1/SPK_2).
+   (VCC/GND to the rails, **RX → D6**, speaker across SPK_1/SPK_2).
 6. Flash the sketch at `firmware/desk-buddy/` (see the README for the
    toolchain setup). Ensure **"USB CDC On Boot" is enabled**, or the serial
    console will contend with the DFPlayer on D6/D7.

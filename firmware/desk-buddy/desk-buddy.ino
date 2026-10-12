@@ -80,8 +80,7 @@ static void behaviourUpdate(unsigned long now) {
   }
 
   if (now - lastAudioMs < MOTION_COOLDOWN_MS) {
-    Serial.printf("[%lu ms] motion -- ignored, cooldown
-", now);
+    Serial.printf("[%lu ms] motion -- ignored, cooldown\n", now);
     return;
   }
 
@@ -89,14 +88,12 @@ static void behaviourUpdate(unsigned long now) {
     /* The audio module refused -- not ready, or a command was too recent.
      * Neither the cooldown nor the track rotation advances, so the next
      * motion event tries the same clip again. */
-    Serial.printf("[%lu ms] motion -- audio not ready, track %u not sent
-",
+    Serial.printf("[%lu ms] motion -- audio not ready, track %u not sent\n",
                   now, (unsigned)nextTrack);
     return;
   }
 
-  Serial.printf("[%lu ms] motion -- playing /mp3/%04u.mp3
-",
+  Serial.printf("[%lu ms] motion -- playing /mp3/%04u.mp3\n",
                 now, (unsigned)nextTrack);
 
   lastAudioMs = now;
@@ -145,12 +142,10 @@ void setup() {
    * even at boot, when millis() is near zero. */
   lastAudioMs = bootMs - MOTION_COOLDOWN_MS;
 
-  Serial.printf("  pir   : OUT=D1 (GPIO3), warm-up %lu s
-",
+  Serial.printf("  pir   : OUT=D1 (GPIO3), warm-up %lu s\n",
                 PIR_WARMUP_MS / 1000UL);
-  Serial.printf("  audio : UART1 tx=D7 rx=D6 @ %d baud, volume %d/30, "
-                "%d tracks
-",
+  Serial.printf("  audio : UART1 tx=D6 rx=D7 @ %d baud, volume %d/30, "
+                "%d tracks\n",
                 DFPLAYER_BAUD, AUDIO_VOLUME, AUDIO_TRACK_COUNT);
   Serial.println(F("  stage : face live, blink animation running"));
   Serial.println(F("  stage : motion-triggered audio active (UNVERIFIED)"));

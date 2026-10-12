@@ -203,10 +203,17 @@
 /* ---------------------------------------------------------------------------
  * Audio -- DFPlayer HW-247A over UART
  *
- * As-built wiring: MCU transmit on D7 (GPIO20) to the module's RX. The
- * module's TX to D6 (GPIO21) is configured as the MCU's receive pin, but may
+ * As-built wiring: MCU transmit on D6 (GPIO21) to the module's RX. The
+ * module's TX to D7 (GPIO20) is configured as the MCU's receive pin, but may
  * not be physically connected -- one-way control works either way, and
  * nothing in this firmware reads from the module yet.
+ *
+ * This direction is taken from firmware/combined-reference, the sketch that
+ * demonstrably plays audio on this build. It is also the natural assignment:
+ * the XIAO silkscreen labels D6 as TX and D7 as RX, and GPIO21/GPIO20 are
+ * UART0's native TX/RX. An earlier revision of this file had the two
+ * inverted, which would have transmitted on a pin the module's RX input is
+ * not connected to -- so no audio at all, with no error to show for it.
  *
  * CAUTION: D6/D7 (GPIO21/GPIO20) are the ESP32-C3's default UART0 pins, which
  * is also where the Arduino serial console lands if "USB CDC On Boot" is
@@ -215,8 +222,8 @@
  * while the console is on the native USB port. Build with USB CDC on boot
  * enabled. See docs/wiring.md.
  * -------------------------------------------------------------------------*/
-#define DFPLAYER_TX_PIN  D7   /* GPIO20 -- MCU transmit -> module RX */
-#define DFPLAYER_RX_PIN  D6   /* GPIO21 -- MCU receive  <- module TX */
+#define DFPLAYER_TX_PIN  D6   /* GPIO21 -- MCU transmit -> module RX */
+#define DFPLAYER_RX_PIN  D7   /* GPIO20 -- MCU receive  <- module TX */
 #define DFPLAYER_BAUD    9600 /* the module's fixed control baud rate */
 
 /* The module ignores commands for a period after power-up. Commands are held
@@ -230,10 +237,12 @@
  * on a command before the next arrives. */
 #define DFPLAYER_COMMAND_GAP_MS  100UL
 
-/* Playback volume, 0-30. Deliberately well below maximum: the amplifier can
- * draw more current than a 500 mA USB port has spare, and the robot shares
- * that supply with the display. See docs/hardware.md. */
-#define AUDIO_VOLUME  18
+/* Playback volume, 0-30. Set to 20 to match firmware/combined-reference, the
+ * value actually used in the verified build, rather than a guess. Still well
+ * below maximum: the amplifier can draw more current than a 500 mA USB port
+ * has spare, and the robot shares that supply with the display. See
+ * docs/hardware.md. */
+#define AUDIO_VOLUME  20
 
 /* Number of clips on the card, as /mp3/0001.mp3 .. /mp3/000N.mp3. */
 #define AUDIO_TRACK_COUNT  3

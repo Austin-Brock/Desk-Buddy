@@ -74,11 +74,11 @@ Expanded, with current status on every edge:
 |---|---|---|
 | MCU → display | 4-wire SPI, hardware peripheral | **Implemented** |
 | Display → face | Adafruit GFX primitives | **Implemented** |
-| MCU → DFPlayer | UART, 9600 8N1 | Module **verified on a bench sketch**; the firmware's `audio.cpp` is **written but never run** |
+| MCU → DFPlayer | UART, 9600 8N1 | **Verified** (MCU transmits on D6); the modular `audio.cpp` is **written but never run** |
 | DFPlayer → microSD | Internal to the module | **Verified** — card read, three tracks play |
 | DFPlayer → speaker | Differential analog | **Verified** — audio audible |
-| Display **and** audio together | — | **Not verified** — never run at the same time |
-| PIR → MCU | Digital input | Sensor **verified on a bench sketch** (D1); the firmware's `motion.cpp` is **written but never run** |
+| All three together | — | ✅ **Verified** — `firmware/combined-reference` runs display, motion, and audio simultaneously |
+| PIR → MCU | Digital input | **Verified** (D1); the modular `motion.cpp` is **written but never run** |
 | MCU → network | Wi-Fi | **Planned** (V2) |
 
 ---

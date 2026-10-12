@@ -284,14 +284,17 @@ remaining risk in this project lives in the interactions.
 | DFPlayer alone | ✅ Verified — three tracks played |
 | PIR alone | ✅ Verified — motion reported over serial |
 | PIR + DFPlayer **sharing power rails** | ✅ Verified — audio played with both on the rails |
-| PIR + DFPlayer **interacting** (motion triggers audio) | ⬜ Firmware written, **never run** |
-| Display + DFPlayer | ⬜ Never connected together |
-| Display + PIR | ⬜ Never connected together |
-| **All three together** | ⬜ Never connected together — the full-system goal |
+| PIR + DFPlayer **interacting** (motion triggers audio) | ✅ Verified |
+| Display + DFPlayer | ✅ Verified |
+| Display + PIR | ✅ Verified |
+| **All three together** | ✅ **Verified** — `firmware/combined-reference` |
+| Blink animation smooth during playback | ⬜ Not characterised |
+| Long-running stability | ⬜ Not tested |
 
-Sharing power rails is not the same as working together: it proves the supply
-holds up with two modules attached, not that the firmware can service both
-while animating a face.
+All three subsystems have been run simultaneously on one build, with a motion
+event triggering audio while a face was on the display. The remaining
+unknowns are about *quality* rather than *function*: whether the animation
+hitches during playback, and whether any of it holds up over hours.
 
 ---
 

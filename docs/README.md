@@ -6,7 +6,7 @@ Engineering documentation for [Desk-Buddy](../README.md).
 |---|---|---|
 | [architecture.md](architecture.md) | System diagram, firmware layers, control flow, scheduling model, state ownership, extension points | Mixed — marked per item |
 | [hardware.md](hardware.md) | Bill of materials, XIAO ESP32C3 GPIO constraints, panel and module properties, power budget, assembly notes | Mixed — marked per part |
-| [wiring.md](wiring.md) | Power distribution, connection tables per subsystem, pin allocation, what has been tested together, bring-up checklist | All three subsystems **verified individually**; **no two verified operating together** |
+| [wiring.md](wiring.md) | Power distribution, connection tables per subsystem, pin allocation, what has been tested together, bring-up checklist | All three subsystems **verified running together** |
 | [display.md](display.md) | Panel configuration, face geometry, animation architecture, blink state machine, timing | **Implemented and verified** |
 | [audio.md](audio.md) | Hardware verification record, DFPlayer selection rationale, microSD layout, UART protocol, proposed interface, integration plan, risks | Standalone playback **verified**; **not integrated** into the firmware |
 | [troubleshooting.md](troubleshooting.md) | Incident log and fault symptom tables — including the reversed-polarity incident that destroyed a DFPlayer Mini | Record |

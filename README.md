@@ -46,8 +46,10 @@ was built, what was chosen over what, and what remains unbuilt.
 | Sequential MP3 playback | ✅ **Three files verified** | `/mp3/0001-0003.mp3` played by track number, commands 20 s apart |
 | Motion detection | ✅ **Verified independently** | HC-SR501 on D1, reported over serial |
 | Breadboard power distribution | ✅ **Verified** | Shared 5 V / GND rails; audio played with the PIR on the same rails |
-| Motion-triggered audio | 🟠 **In progress** | Firmware written for the modular architecture; **not yet run on hardware** |
-| Display + audio + motion together | ⬜ **Not tested** | No two subsystems have operated together |
+| **Display + audio + motion together** | ✅ **Verified** | All three running simultaneously on one build — [`firmware/combined-reference`](firmware/combined-reference) |
+| Motion-triggered audio | ✅ **Verified** | A motion event plays the next clip; proven by the reference sketch |
+| Blink smoothness during playback | ⬜ **Not characterised** | Whether the animation hitches while a clip plays is untested |
+| Modular firmware (`firmware/desk-buddy/`) | 🟠 **Written, never run** | The intended destination; the reference sketch is what has actually run |
 | Reminder scheduling | ⬜ **Planned** | Interval-driven reminders, after motion-triggered audio works |
 | Long-running stability | ⬜ **Not tested** | Nothing has been left running for an extended period |
 | Battery power | ⬜ **Planned** | Blocked on the display's backlight — see [hardware.md](docs/hardware.md) |
@@ -58,12 +60,16 @@ was built, what was chosen over what, and what remains unbuilt.
 > verified on hardware. 🟠 means partially proven or in progress. ⬜ means
 > intent only — no wiring, no code.
 >
-> Note the gap between "verified independently" and "integrated". Three
-> subsystems work — display, audio, and motion detection — each proven on its
-> own. **No two of them have been verified operating together.** The PIR and
-> the DFPlayer have shared breadboard power rails, which proves the supply
-> holds up, not that the subsystems cooperate. The display has never been
-> connected alongside the other two.
+> **All three subsystems now run together.** A face on the display, motion
+> detection, and audio playback, simultaneously on one build, with a motion
+> event triggering the next clip.
+>
+> The gap that remains is between *the robot works* and *this repository's
+> firmware works*. What ran is
+> [`firmware/combined-reference`](firmware/combined-reference) — committed
+> verbatim as the verified reference. The modular firmware under
+> `firmware/desk-buddy/` is the intended destination and **has still never
+> been flashed.**
 
 ---
 
@@ -93,18 +99,23 @@ frames, hold for 70 ms, and reopen — 214 ms end to end. Only the 160×72 regio
 containing the eyes is repainted, so there is no flicker and the smile never
 visibly redraws.
 
-**Whether it makes a sound is now an open question rather than a no.** The
-firmware contains a motion-triggered audio behaviour — a new motion event
-plays the next of three clips, with a 20-second cooldown — but **it has never
-been run on hardware.** The DFPlayer and the PIR were each proven separately
-with bench sketches; this firmware combining them with the animation is
-written and unverified. See [docs/audio.md](docs/audio.md) and the
-[roadmap](docs/project-roadmap.md).
+**It now reacts.** Walk past it and it plays a clip — the next of three in
+rotation, with a 20-second cooldown so a person working at a desk does not
+retrigger it constantly. The face is on screen the whole time.
+
+That is verified on hardware with
+[`firmware/combined-reference`](firmware/combined-reference). What is *not*
+yet characterised is whether the blink animation stays perfectly smooth while
+a clip plays — that reference sketch redraws the whole frame on every blink,
+which is the thing the modular firmware's partial-redraw animation exists to
+avoid. See [docs/audio.md](docs/audio.md).
 
 ### Verification status
 
 | Claim | How it was verified |
 |---|---|
+| Display, motion, and audio run simultaneously | Observed on hardware, `firmware/combined-reference` |
+| Motion triggers audio playback | Follows from the code: playback is called from exactly one place, the new-motion branch |
 | Display initialises at 240×320 | Observed on hardware |
 | Face renders as described | Observed on hardware |
 | Eyes blink without flicker | Observed on hardware |
@@ -334,7 +345,9 @@ Desk-Buddy/
 ├── LICENSE                       MIT
 ├── .gitignore
 ├── firmware/
-│   └── desk-buddy/               Arduino sketch (folder name must match .ino)
+│   ├── combined-reference/       ✅ VERIFIED: all three subsystems together
+│   │   └── combined-reference.ino    committed verbatim, as flashed
+│   └── desk-buddy/               modular firmware — written, not yet flashed
 │       ├── desk-buddy.ino        entry point: boot, run loop, behaviour
 │       ├── config.h              pins, geometry, palette, timing, volume
 │       ├── display.h / .cpp      hardware layer: ST7789 bring-up
@@ -363,6 +376,7 @@ Desk-Buddy/
 | See how motion is sampled and debounced | `firmware/desk-buddy/motion.cpp` |
 | See the DFPlayer command frames | `firmware/desk-buddy/audio.cpp` |
 | See the boot order, scheduler, and motion→audio policy | `firmware/desk-buddy/desk-buddy.ino` |
+| See code that is **known to work on hardware** | `firmware/combined-reference/` |
 | Understand *why* any of it is that way | `docs/` |
 
 The Arduino IDE requires a sketch's folder name to match its `.ino` file name,

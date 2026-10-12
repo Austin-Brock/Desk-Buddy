@@ -13,8 +13,8 @@ dependency instead: each phase unblocks the next.
 | | |
 |---|---|
 | **Working** | ST7789 display bring-up, minimalist face, non-blocking randomised blink animation |
-| **Working, separately** | DFPlayer audio: three MP3 files played sequentially from microSD through the speaker. HC-SR501 PIR: clean motion HIGH/LOW transitions reported over serial. Both verified on standalone bench sketches, **neither** in the project firmware |
-| **In progress** | Motion-triggered audio: firmware written for the modular architecture, **not yet run on hardware**. Display, audio, and motion have never operated together |
+| **Working, all together** | Face on the display, PIR motion detection, and DFPlayer audio running simultaneously on one build, with a motion event triggering the next clip. Verified with `firmware/combined-reference` |
+| **In progress** | Porting that behaviour to the modular firmware under `firmware/desk-buddy/`, which is written but **has never been flashed** |
 | **Planned next** | Reminder scheduling, then presence detection |
 | **Power** | USB-C only |
 | **Enclosure** | None — bare modules on jumper wires |
@@ -39,15 +39,12 @@ something useful at intervals you chose.
 - [x] Move from Dupont-jumper-to-module wiring onto the breadboard
 - [x] Shared 5 V rail and a single common ground point
 - [x] Shared breadboard power tested with the PIR and the DFPlayer together
-- [ ] Reconnect the display to the shared build
-- [ ] Verify the display still runs unchanged after the move
+- [x] Reconnect the display to the shared build
+- [x] Verify the display still runs after the move
 
-The PIR and the DFPlayer now share the rails and audio plays with both
-attached. The display has not been brought onto the shared build yet, so the
-three-module arrangement the enclosure will need has never existed. See
-[hardware.md](hardware.md), and
-[troubleshooting.md](troubleshooting.md) for the reversed-polarity incident
-during this consolidation.
+All three modules now share the breadboard and run at the same time. See
+[hardware.md](hardware.md), and [troubleshooting.md](troubleshooting.md) for
+the reversed-polarity incident during this consolidation.
 
 ### Audio — **standalone playback verified, integration in progress**
 
@@ -93,11 +90,12 @@ so the three-module arrangement still does not exist.
 V1 is done when all of the following are true at once, on hardware:
 
 1. The robot boots from USB with no computer attached and shows an animated
-   face.
-2. It plays a reminder clip on a configured interval.
-3. The face keeps animating smoothly during playback.
+   face. — **met**
+2. It plays a reminder clip on a configured interval. — *partly: it plays on
+   motion, not yet on an interval*
+3. The face keeps animating smoothly during playback. — **not characterised**
 4. It runs for 24 hours without a reset, a hang, or a visible animation
-   artefact.
+   artefact. — **not tested**
 
 Criterion 4 is included because nothing in this project has yet been left
 running long enough to find out.
@@ -138,19 +136,33 @@ more firmware.
 
 - [ ] Evaluate an mmWave presence sensor (e.g. LD2410) as a replacement
 
-### Motion-triggered audio — **firmware written, never run**
+### Motion-triggered audio — **working, via the reference sketch**
 
-> The checked items in this section mean *code exists and was statically
-> checked*, not *works*. Nothing here has been on hardware.
+Verified on hardware with `firmware/combined-reference`: a motion event plays
+the next of three clips while a face is on the display.
+
+- [x] Run motion-triggered audio on hardware
+- [x] Display, motion, and audio operating simultaneously
+- [ ] Characterise blink smoothness during playback
+- [ ] Confirm the three-clip rotation completes across repeated triggers
+- [ ] Confirm the cooldown holds over a long session
+- [ ] Port the behaviour to the modular firmware and verify it there
+
+> The modular firmware under `firmware/desk-buddy/` implements the same
+> behaviour with a partial-redraw animation, a PIR warm-up window, and edge
+> debouncing. **It has never been flashed.** Two defects were already found
+> in it by comparison against the working sketch -- an inverted UART pin
+> assignment and five malformed string literals -- which is the argument for
+> a compile check below.
 
 A combined behaviour: a new motion event plays the next of the three clips in
 rotation, with a 20-second cooldown so a single person moving at a desk does
 not retrigger it continuously.
 
-- [ ] **Run the motion-triggered audio firmware on hardware.** Nothing below
-      can be assessed until this happens
-- [ ] Verify the blink animation stays smooth while a clip plays
-- [ ] Confirm the cooldown behaves as intended across repeated triggers
+- [ ] **Get a compile check into the project.** `arduino-cli compile` run
+      locally, or a GitHub Actions workflow on push. Two defects in the
+      modular firmware would have been caught instantly by a compiler, and
+      static inspection missed one of them entirely
 - [ ] Decide whether to wire the DFPlayer BUSY pin for completion polling
 - [ ] Long-running stability test
 - [ ] Reminder scheduling proper — interval-driven rather than motion-driven
@@ -268,13 +280,16 @@ Worth stating, because "could this do X" has a cost:
         |                        with PIR + DFPlayer  (DONE)
         |                                 |
         |                                 v
-        |                   motion-triggered audio firmware
-        |                     (WRITTEN, NEVER RUN)  <-- YOU ARE HERE
+        |                   motion-triggered audio
+        |                        (WORKING)
         |                                 |
         +----------------+----------------+
                          v
          all three on one build: display + audio + motion
+                      (WORKING -- combined-reference)
                          |
+                         +--> port to the modular firmware  <-- YOU ARE HERE
+                         |      and verify it there
                          v
             reminder scheduling ----> stability test ----> V1 COMPLETE
          |                                                  |

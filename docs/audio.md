@@ -321,8 +321,8 @@ its test passes on hardware.
 | ✅ | 5 | UART driver and handshake | Module accepts commands at 9600 baud |
 | ✅ | 6 | Play a track at a set volume | Three clips played sequentially |
 | ✅ | 2 | Move the build to the breadboard; shared 5 V rail and common ground | PIR and DFPlayer both on the rails; audio played. **Display not yet reconnected to the shared build** |
-| 🟠 | 7 | Port the audio code into the firmware as `audioUpdate()` | **Code written, never run.** Acceptance test unchanged: a clip plays through while the eyes keep blinking on schedule, with no visible hitch |
-| ⬜ | 8 | Reminder scheduler: configurable interval, selects a clip | A reminder fires on its interval while the face animates normally |
+| 🟠 | 7 | Audio alongside the animation | **Partly met.** Audio and a blinking face do run together (`firmware/combined-reference`). The rest of the test — no visible hitch in the animation during playback — is **not characterised**, and the modular `audio.cpp` has never run |
+| 🟠 | 8 | A trigger selects and plays a clip | **Motion-triggered playback works.** Interval-driven reminders are still unbuilt |
 | ⬜ | 9 | Measure current draw at idle and at playback peak | Figures recorded in [hardware.md](hardware.md), replacing the datasheet estimates |
 
 Steps 3–6 were completed out of order with step 2 — the module was proven on a
@@ -347,7 +347,7 @@ scheduling.
 | DFPlayer does not acknowledge commands | **Retired** | TX/RX swapped, missing common ground, or module not ready after power-up | Resolved: the module accepts commands at 9600 baud |
 | Clone modules behave differently | **Reduced** | DFPlayer Mini is widely cloned and variants differ in timing and command support | The module in hand is marked **HW-247A** and responds correctly to `0x06` and `0x12`; other commands, notably status queries and the BUSY behaviour, are still unproven on this variant |
 | Card not recognised | **Retired** | Wrong format, exFAT, or stray metadata files | Resolved: the card is read and `/mp3/NNNN.mp3` addressing works |
-| Animation stutters during playback | **Open — the main open risk** | Serial handling competing with SPI transfers on one core, and the two subsystems have never run together | Step 7's acceptance test exists specifically to catch this |
+| Animation stutters during playback | **Open — still the main open risk** | The subsystems now run together, but smoothness was not characterised. The reference sketch redraws the full frame per blink and calls `Serial1.flush()`, so it is the worst case for this | Watch the eyes during playback; the modular firmware's partial redraw is the mitigation |
 | A clip outlasts its reminder interval | **Open** | The bench test spaced *commands* 20 s apart without measuring clip length, so overlap was never ruled out | Schedule from playback completion (BUSY or status query), not from the previous command |
 
 ---

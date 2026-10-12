@@ -31,9 +31,11 @@ The build has moved onto the breadboard: the XIAO feeds 5 V to the red rail
 and GND to the blue rail, and the PIR and DFPlayer both take their supply from
 those rails. Audio has played with both modules on the shared rails.
 
-The display still connects directly to the XIAO's 3V3 pin rather than the 5 V
-rail, and **has not been connected at the same time as the other two.** Each
-subsystem is verified on its own; nothing is verified operating together.
+The display connects directly to the XIAO's 3V3 pin rather than the 5 V rail.
+**All three modules have been run simultaneously on this arrangement** — a
+face on the display, motion detection, and audio playback at once. What has
+not been characterised is whether the blink animation stays smooth during
+playback.
 
 ---
 
@@ -137,10 +139,11 @@ The module plays MP3 files from its microSD card through the speaker, driven
 over UART by the XIAO. The module in hand carries the board marking
 **HW-247A**, a DFPlayer Mini variant.
 
-What is **not** verified: audio and the display running together, and
-therefore none of the interference or power hazards below. Those were
-identified while planning and remain unassessed. See [audio.md](audio.md) for
-the verification record and the integration plan.
+Audio and the display have since been run together, so the arrangement works
+at the level of "it functions". The interference and power hazards below were
+identified while planning and remain **unmeasured** — nobody has listened for
+SPI bleed into the speaker or metered the supply under load. See
+[audio.md](audio.md).
 
 | Property | Value |
 |---|---|

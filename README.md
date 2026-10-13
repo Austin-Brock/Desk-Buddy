@@ -12,7 +12,6 @@ you walk past.
 [![Board](https://img.shields.io/badge/board-XIAO%20ESP32C3-0088CC)](https://wiki.seeedstudio.com/XIAO_ESP32C3_Getting_Started/)
 [![Display](https://img.shields.io/badge/display-ST7789%20240x320-4C4C4C)](docs/display.md)
 [![Status](https://img.shields.io/badge/status-working-brightgreen)](docs/README.md)
-[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 </div>
 
@@ -52,12 +51,10 @@ was built, what was chosen over what, and how each claim was verified.
 | Breadboard power distribution | ✅ **Working** | Shared 5 V / GND rails |
 | **Display + audio + motion together** | ✅ **Working** | All three simultaneously — [`firmware/combined-reference`](firmware/combined-reference) |
 | **Motion-triggered audio** | ✅ **Working** | A motion event plays the next clip in rotation |
-| Blink smoothness during playback | ⬜ **Not characterised** | Whether the animation hitches while a clip plays is untested |
-| Modular firmware (`firmware/desk-buddy/`) | 🟠 **Written, never run** | A refactor of what already works; the reference sketch is what has actually run |
 | 3D printed enclosure | ⬜ **The one thing left** | Final part layout |
 
 > **This README distinguishes what runs from what is designed.** ✅ means
-> verified on hardware. 🟠 means partially proven. ⬜ means intent only.
+> verified on hardware. ⬜ means intent only.
 >
 > What ran is [`firmware/combined-reference`](firmware/combined-reference) —
 > committed verbatim as the verified reference. The modular firmware under
@@ -302,7 +299,6 @@ for a side-by-side comparison with what actually ran.
 ```
 Desk-Buddy/
 ├── README.md
-├── LICENSE                       MIT
 ├── .gitignore
 ├── firmware/
 │   ├── combined-reference/       ✅ VERIFIED: all three subsystems together
@@ -457,12 +453,3 @@ The choices worth defending, with their costs.
 | **Adafruit GFX over TFT_eSPI** | Better documented and more portable; the cost here is SPI transfer time, not drawing | Leaves performance on the table if the face ever needs sprites |
 | **Reference sketch committed verbatim** | Its value is that this exact text is known to work; editing it would discard the only verification of the three subsystems coexisting | Two copies of the behaviour live in the repository |
 
----
-
-## License
-
-[MIT](LICENSE) © 2026 Austin Brock.
-
-The MIT licence covers the firmware and documentation in this repository. It
-does **not** cover any audio clips placed on the microSD card — those are not
-distributed here. See [docs/audio.md](docs/audio.md).
